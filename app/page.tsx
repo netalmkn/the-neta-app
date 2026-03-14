@@ -66,6 +66,12 @@ function toDateStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function shortDate(s: string) {
+  if (!s || s === "No deadline") return "";
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 function formatTime(t: string) {
   if (!t) return "";
   const [h, m] = t.split(":").map(Number);
@@ -178,13 +184,11 @@ function Divider() {
 
 function SectionTitle({ label, count, action }: { label: string; count?: number; action?: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between mb-1" style={{ padding: "6px 0 4px" }}>
-      <div className="flex items-center gap-1.5">
-        <span className="text-[13px] font-semibold" style={{ color: N.text }}>{label}</span>
-        {count !== undefined && (
-          <span className="text-[12px] tabular-nums px-1.5 py-0.5 rounded-md" style={{ background: N.hover, color: N.muted }}>{count}</span>
-        )}
-      </div>
+    <div className="flex items-center gap-3 mb-5">
+      <span className="text-[11px] font-semibold uppercase tracking-widest whitespace-nowrap flex-shrink-0" style={{ color: N.muted }}>
+        {label}{count !== undefined && count > 0 ? ` · ${count}` : ""}
+      </span>
+      <div className="flex-1 h-px" style={{ background: N.border }} />
       {action}
     </div>
   );
@@ -865,9 +869,9 @@ function TaskRow({ task, onToggle, onDelete, onUpdateQuestions, subjects }: {
     <div
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
-      className="px-3 py-2.5 rounded-xl transition-colors"
-      style={{ background: hov ? N.hover : "transparent" }}>
-      <div className="flex items-center gap-2.5">
+      className="py-3 transition-colors group"
+      style={{ borderBottom: `1px solid ${N.border}` }}>
+      <div className="flex items-center gap-3">
         {/* Subject color dot */}
         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: subColor }} />
 
@@ -875,34 +879,30 @@ function TaskRow({ task, onToggle, onDelete, onUpdateQuestions, subjects }: {
         <button onClick={() => onToggle(task.id)}
           className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-all"
           style={task.done
-            ? { background: N.muted, borderColor: N.muted }
+            ? { background: subColor, borderColor: subColor }
             : { background: "transparent", borderColor: N.border }}>
           {task.done && <Ico.check />}
         </button>
 
-        {/* Name + subject */}
-        <div className="flex-1 min-w-0">
-          <span className="text-[13px] block truncate"
-            style={{ color: task.done ? N.muted : N.text, textDecoration: task.done ? "line-through" : "none" }}>
-            {task.name}
-          </span>
-          {task.subject && (
-            <span className="text-[11px]" style={{ color: N.muted }}>{task.subject}</span>
-          )}
-        </div>
+        {/* Name */}
+        <span className="flex-1 text-[14px] min-w-0 truncate"
+          style={{ color: task.done ? N.muted : N.text, textDecoration: task.done ? "line-through" : "none" }}>
+          {task.name}
+        </span>
 
-        {/* Properties */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
+        {/* Meta */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {task.subject && (
+            <span className="text-[12px] hidden sm:block" style={{ color: N.muted }}>{task.subject}</span>
+          )}
           <PropChip bg={t.bg} color={t.text}>{t.label}</PropChip>
           {task.deadline !== "No deadline" && (
-            <span className="text-[11px] hidden sm:flex items-center gap-0.5" style={{ color: N.muted }}>
-              <Ico.clock />{task.deadline}
-            </span>
+            <span className="text-[12px] hidden sm:block" style={{ color: N.muted }}>{shortDate(task.deadline)}</span>
           )}
           {onDelete && hov && (
-            <button onClick={() => onDelete(task.id)} className="transition-colors" style={{ color: N.border }}
+            <button onClick={() => onDelete(task.id)} className="transition-colors opacity-0 group-hover:opacity-100" style={{ color: N.muted }}
               onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = N.border)}>
+              onMouseLeave={(e) => (e.currentTarget.style.color = N.muted)}>
               <Ico.trash />
             </button>
           )}
@@ -911,7 +911,7 @@ function TaskRow({ task, onToggle, onDelete, onUpdateQuestions, subjects }: {
 
       {/* Question grid */}
       {hasQ && onUpdateQuestions && !task.done && (
-        <div className="ml-10">
+        <div className="ml-10 mt-1">
           <QuestionGrid
             total={task.total_questions!}
             completed={task.completed_questions ?? 0}
@@ -1398,6 +1398,7 @@ export default function Home() {
   const exams       = useMemo(() => tasks.filter(isUpcomingExam), [tasks]);
   const homework    = useMemo(() => tasks.filter((t) => t.type === "homework" && isThisWeek(t)), [tasks]);
   const tasksOnly   = useMemo(() => tasks.filter((t) => isThisWeek(t) && t.type !== "homework"), [tasks]);
+  const todayTasks  = useMemo(() => tasks.filter((t) => !t.done && t.type !== "exam" && t.deadline === todayStr), [tasks, todayStr]);
 
   const eventCounts = useMemo(() => {
     const m: Record<string, number> = {};
@@ -1434,6 +1435,17 @@ export default function Home() {
     while (days.has(toDateStr(d))) { count++; d.setDate(d.getDate() - 1); }
     return count;
   }, [studyLogs]);
+
+  const recommendedSubject = useMemo(() => {
+    if (!subjects.length) return null;
+    const pending: Record<string, number> = {};
+    undoneTasks.forEach((t) => { if (t.subject) pending[t.subject] = (pending[t.subject] ?? 0) + 1; });
+    const withWork = subjects.filter((s) => (pending[s.name] ?? 0) > 0);
+    if (withWork.length > 0)
+      return withWork.reduce((a, b) => (pending[a.name] ?? 0) >= (pending[b.name] ?? 0) ? a : b);
+    // fallback: least studied subject this week
+    return subjects.reduce((a, b) => (weeklyHours[a.id] ?? 0) <= (weeklyHours[b.id] ?? 0) ? a : b);
+  }, [subjects, undoneTasks, weeklyHours]);
 
   const activeSemesterName = semesters.find((s) => s.id === activeSemesterId)?.name;
   const totalHrsThisWeek = Object.values(weeklyHours).reduce((a, b) => a + b, 0);
@@ -1472,7 +1484,7 @@ export default function Home() {
         </>
       )}
 
-      {/* ── Main Content ── */}
+      {/* ── Main ── */}
       <main className="flex-1 lg:ml-56 min-h-screen">
 
         {/* Mobile top bar */}
@@ -1486,286 +1498,263 @@ export default function Home() {
           </button>
           <span className="text-[14px] font-semibold" style={{ color: N.text }}>Dashboard</span>
           {activeSemesterName && (
-            <span className="ml-auto text-[11px] px-2 py-0.5 rounded-lg" style={{ background: N.hover, color: N.muted }}>
+            <span className="ml-auto text-[11px] px-2.5 py-1 rounded-lg" style={{ background: N.hover, color: N.muted }}>
               {activeSemesterName}
             </span>
           )}
         </div>
 
-        {/* Page body */}
-        <div className="px-4 lg:px-8 py-6 pb-32 lg:pb-12 max-w-screen-xl mx-auto">
+        <div className="px-5 lg:px-10 py-8 pb-32 lg:pb-12 max-w-5xl mx-auto">
 
-          {/* ── Header ── */}
-          <div className="mb-6">
-            <h1 className="text-[26px] lg:text-[30px] font-bold tracking-tight mb-1" style={{ color: N.text }}>
-              {greet()}, Neta 👋
-            </h1>
-            <p className="text-[13px]" style={{ color: N.muted }}>
-              {today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
-              {activeSemesterName && <> · <span style={{ color: N.accent }}>{activeSemesterName}</span></>}
-            </p>
-          </div>
-
-          {/* ── Stat cards ── */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            {[
-              { label: "Tasks left",      value: undoneTasks.length,              bg: "#DBEAFE", num: "#1D4ED8" },
-              { label: "Hours this week", value: `${totalHrsThisWeek.toFixed(1)}h`, bg: "#DCFCE7", num: "#15803D" },
-              { label: "Upcoming exams",  value: exams.length,                    bg: "#FFEDD5", num: "#C2410C" },
-              { label: "Day streak",      value: streak ? `${streak} 🔥` : "0",  bg: "#EDE9FE", num: "#7C3AED" },
-            ].map((s) => (
-              <div key={s.label} className="rounded-2xl px-4 py-4"
-                style={{ background: s.bg, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
-                <p className="text-[11px] font-semibold uppercase tracking-widest mb-2"
-                  style={{ color: s.num, opacity: 0.7 }}>{s.label}</p>
-                <p className="text-[30px] font-bold leading-none" style={{ color: s.num }}>{s.value}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* ── Recommended Study ── */}
-          {subjects.length > 0 && (
-            <div className="mb-6 rounded-2xl p-5 flex items-center justify-between gap-4"
-              style={{ background: `linear-gradient(135deg, #EBF3FF 0%, #F0F8FF 100%)`, border: `1px solid ${N.border}` }}>
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-widest mb-1" style={{ color: N.accent }}>
-                  Recommended
+          {/* ── Greeting ── */}
+          <div className="flex items-start justify-between gap-4 mb-10">
+            <div>
+              <h1 className="text-[28px] lg:text-[34px] font-bold tracking-tight leading-tight" style={{ color: N.text }}>
+                {greet()}, Neta
+              </h1>
+              <p className="text-[14px] mt-1" style={{ color: N.muted }}>
+                {today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                {activeSemesterName && <> · <span style={{ color: N.accent }}>{activeSemesterName}</span></>}
+              </p>
+              {(undoneTasks.length > 0 || exams.length > 0 || totalHrsThisWeek > 0) && (
+                <p className="text-[12px] mt-2 flex items-center gap-3" style={{ color: N.muted }}>
+                  {undoneTasks.length > 0 && <span>{undoneTasks.length} tasks this week</span>}
+                  {exams.length > 0 && <><span style={{ color: N.border }}>·</span><span>{exams.length} exam{exams.length > 1 ? "s" : ""}</span></>}
+                  {totalHrsThisWeek > 0 && <><span style={{ color: N.border }}>·</span><span>{totalHrsThisWeek.toFixed(1)}h studied</span></>}
+                  {streak > 0 && <><span style={{ color: N.border }}>·</span><span>{streak} day streak 🔥</span></>}
                 </p>
-                <p className="text-[17px] font-bold mb-0.5" style={{ color: N.text }}>Ready to study?</p>
-                <p className="text-[13px] truncate" style={{ color: N.muted }}>
-                  {activeSemesterName ?? "Start a semester"} · Log a session to track your progress
-                </p>
-              </div>
-              <button onClick={() => setModal("study")}
-                className="flex-shrink-0 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all active:scale-95"
-                style={{ background: N.accent, color: "white", boxShadow: `0 4px 12px ${N.accent}40` }}>
-                + Log Session
-              </button>
+              )}
             </div>
-          )}
+            <button onClick={() => setModal("study")}
+              className="flex-shrink-0 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all active:scale-95 hidden sm:flex items-center gap-1.5"
+              style={{ background: N.accent, color: "white", boxShadow: `0 4px 14px ${N.accent}40` }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="white" strokeWidth="2.5" strokeLinecap="round"/></svg>
+              Log Study
+            </button>
+          </div>
 
-          {/* ── No semester callout ── */}
+          {/* ── No semester ── */}
           {semesters.length === 0 && (
-            <div className="flex items-start gap-3 px-4 py-3 rounded-xl mb-6"
+            <div className="flex items-center gap-4 px-5 py-4 rounded-2xl mb-8"
               style={{ background: "#FFFBEB", border: "1px solid #FDE68A" }}>
-              <span style={{ fontSize: 16 }}>💡</span>
+              <span className="text-lg">💡</span>
               <div className="flex-1">
-                <p className="text-[13px] font-semibold" style={{ color: "#92400E" }}>No semester created yet</p>
-                <p className="text-[12px] mt-0.5" style={{ color: "#B45309" }}>Create a semester to track courses and study progress.</p>
+                <p className="text-[14px] font-semibold" style={{ color: "#92400E" }}>Start by creating a semester</p>
+                <p className="text-[12px] mt-0.5" style={{ color: "#B45309" }}>Add your courses to track tasks, exams, and study time.</p>
               </div>
               <button onClick={() => setModal("semester")}
-                className="text-[12px] font-semibold px-3 py-1.5 rounded-lg flex-shrink-0"
+                className="px-4 py-2 rounded-xl text-[12px] font-semibold flex-shrink-0"
                 style={{ background: "#F59E0B", color: "white" }}>
                 Create
               </button>
             </div>
           )}
 
-          {/* ── 2-Column Grid ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+          {/* ── Today's Focus ── */}
+          <div className="mb-10">
+            <SectionTitle label="Today's Focus"
+              action={
+                <button onClick={() => setModal("task")}
+                  className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-colors flex-shrink-0"
+                  style={{ color: N.accent }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = N.accentBg)}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                  <Ico.plus /> Add task
+                </button>
+              }
+            />
+            {tasksLoading ? (
+              [1,2].map((i) => <div key={i} className="h-12 rounded-xl animate-pulse mb-2" style={{ background: N.hover }} />)
+            ) : todayTasks.length === 0 ? (
+              <p className="text-[15px] py-2" style={{ color: N.muted }}>
+                {undoneTasks.length === 0 ? "Nothing due — enjoy your day ✨" : "No tasks due today — check this week below"}
+              </p>
+            ) : (
+              <div>
+                {todayTasks.map((t) => (
+                  <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask}
+                    onUpdateQuestions={updateTaskQuestions} subjects={subjects} />
+                ))}
+              </div>
+            )}
+          </div>
 
-            {/* ── Left: Tasks + Assignments ── */}
-            <div className="lg:col-span-3 space-y-5">
+          {/* ── Recommended Study ── */}
+          {recommendedSubject && (
+            <div className="mb-10 flex items-center gap-4 px-5 py-4 rounded-2xl"
+              style={{ background: "white", border: `1px solid ${N.border}`, boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
+              <div className="w-1 h-10 rounded-full flex-shrink-0" style={{ background: recommendedSubject.color }} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-widest mb-0.5" style={{ color: N.muted }}>
+                  Recommended Study
+                </p>
+                <p className="text-[16px] font-bold truncate" style={{ color: N.text }}>{recommendedSubject.name}</p>
+              </div>
+              <button onClick={() => setModal("study")}
+                className="flex-shrink-0 px-4 py-2 rounded-xl text-[13px] font-semibold transition-all active:scale-95"
+                style={{ background: N.accent, color: "white" }}>
+                Start →
+              </button>
+            </div>
+          )}
 
-              {/* Tasks */}
-              <div className="rounded-2xl p-5" style={{ background: "white", boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-[15px] font-bold" style={{ color: N.text }}>Tasks</h2>
-                    {tasksOnly.length > 0 && (
-                      <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold"
-                        style={{ background: "#DBEAFE", color: "#1D4ED8" }}>{tasksOnly.length}</span>
-                    )}
-                  </div>
-                  <button onClick={() => setModal("task")}
-                    className="flex items-center gap-1 text-[12px] font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                    style={{ background: N.hover, color: N.text }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = N.active)}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = N.hover)}>
-                    <Ico.plus /> New task
-                  </button>
-                </div>
+          {/* ── 2-column layout ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
+
+            {/* ── Left: This week's tasks + assignments ── */}
+            <div className="lg:col-span-3 space-y-10">
+
+              {/* This Week */}
+              <div>
+                <SectionTitle label="This Week" count={undoneTasks.length}
+                  action={
+                    <button onClick={() => setModal("task")}
+                      className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-colors flex-shrink-0"
+                      style={{ color: N.accent }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = N.accentBg)}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                      <Ico.plus /> Add
+                    </button>
+                  }
+                />
                 {tasksLoading ? (
-                  [1,2,3].map((i) => <div key={i} className="h-11 rounded-xl animate-pulse mb-2" style={{ background: N.hover }} />)
-                ) : tasksOnly.length === 0 ? (
-                  <div className="text-center py-6">
-                    <p className="text-[13px]" style={{ color: N.muted }}>All clear! No tasks this week 🎉</p>
-                  </div>
+                  [1,2,3].map((i) => <div key={i} className="h-12 rounded-xl animate-pulse mb-2" style={{ background: N.hover }} />)
+                ) : undoneTasks.length === 0 ? (
+                  <p className="text-[14px] py-2" style={{ color: N.muted }}>All caught up for the week 🎉</p>
                 ) : (
-                  tasksOnly.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} subjects={subjects} />)
+                  <div>
+                    {undoneTasks.map((t) => (
+                      <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask}
+                        onUpdateQuestions={updateTaskQuestions} subjects={subjects} />
+                    ))}
+                  </div>
                 )}
                 {doneTasks.length > 0 && (
                   <>
                     <button onClick={() => setShowDone(!showDone)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 mt-2 text-[12px] font-medium transition-colors rounded-lg w-full"
-                      style={{ color: N.muted }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = N.hover)}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                      className="flex items-center gap-1.5 py-2 mt-1 text-[12px] font-medium transition-colors"
+                      style={{ color: N.muted }}>
                       <span style={{ transform: showDone ? "rotate(90deg)" : "none", transition: "transform 0.15s", display: "inline-block" }}>
                         <Ico.chevR />
                       </span>
                       {doneTasks.length} completed
                     </button>
-                    {showDone && doneTasks.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} subjects={subjects} />)}
+                    {showDone && doneTasks.map((t) => (
+                      <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} subjects={subjects} />
+                    ))}
                   </>
                 )}
               </div>
 
-              {/* Assignments */}
-              <div className="rounded-2xl p-5" style={{ background: "white", boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-[15px] font-bold" style={{ color: N.text }}>Assignments</h2>
-                    {homework.length > 0 && (
-                      <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold"
-                        style={{ background: "#EFF6FF", color: "#1D4ED8" }}>{homework.length}</span>
-                    )}
+              {/* Subjects overview */}
+              {subjects.length > 0 && (
+                <div>
+                  <SectionTitle label="Subjects" />
+                  <div className="space-y-1">
+                    {subjects.map((s) => {
+                      const pending = undoneTasks.filter((t) => t.subject === s.name).length;
+                      const hrs = weeklyHours[s.id] ?? 0;
+                      const subExam = exams.find((e) => e.subject === s.name);
+                      return (
+                        <div key={s.id} className="flex items-center gap-3 py-3 group"
+                          style={{ borderBottom: `1px solid ${N.border}` }}>
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                          <span className="text-[14px] font-medium flex-1" style={{ color: N.text }}>{s.name}</span>
+                          <div className="flex items-center gap-3 text-[12px]" style={{ color: N.muted }}>
+                            {pending > 0 && (
+                              <span>{pending} pending</span>
+                            )}
+                            {subExam && (
+                              <span style={{ color: "#C2410C" }}>exam {shortDate(subExam.deadline)}</span>
+                            )}
+                            {hrs > 0 && (
+                              <span style={{ color: N.accent, fontWeight: 600 }}>{hrs.toFixed(1)}h</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <button onClick={() => setModal("task")}
-                    className="flex items-center gap-1 text-[12px] font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                    style={{ background: N.hover, color: N.text }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = N.active)}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = N.hover)}>
-                    <Ico.plus /> New
-                  </button>
                 </div>
-                {homework.length === 0 ? (
-                  <div className="text-center py-6">
-                    <p className="text-[13px]" style={{ color: N.muted }}>No assignments due this week 🎉</p>
-                  </div>
-                ) : (
-                  homework.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} subjects={subjects} />)
-                )}
-              </div>
+              )}
 
             </div>
 
-            {/* ── Right: Exams + Study + Calendar ── */}
-            <div className="lg:col-span-2 space-y-5">
+            {/* ── Right: Exams + Calendar + Study + Timer ── */}
+            <div className="lg:col-span-2 space-y-10">
 
               {/* Upcoming Exams */}
-              <div className="rounded-2xl p-5" style={{ background: "white", boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-[15px] font-bold" style={{ color: N.text }}>Upcoming Exams</h2>
-                    {exams.length > 0 && (
-                      <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold"
-                        style={{ background: "#FFEDD5", color: "#C2410C" }}>{exams.length}</span>
-                    )}
-                  </div>
-                  <button onClick={() => setModal("exam")}
-                    className="flex items-center gap-1 text-[12px] font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                    style={{ background: N.hover, color: N.text }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = N.active)}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = N.hover)}>
-                    <Ico.plus /> New
-                  </button>
-                </div>
+              <div>
+                <SectionTitle label="Upcoming Exams" count={exams.length}
+                  action={
+                    <button onClick={() => setModal("exam")}
+                      className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-colors flex-shrink-0"
+                      style={{ color: N.accent }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = N.accentBg)}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                      <Ico.plus /> Add
+                    </button>
+                  }
+                />
                 {exams.length === 0 ? (
-                  <p className="text-center py-4 text-[13px]" style={{ color: N.muted }}>No exams in the next 7 days</p>
+                  <p className="text-[14px] py-2" style={{ color: N.muted }}>No exams this week</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div>
                     {exams.map((exam) => {
                       const [ey, em, ed] = exam.deadline.split("-").map(Number);
                       const daysLeft = Math.ceil((new Date(ey, em - 1, ed).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                       const subColor = subjects.find((s) => s.name === exam.subject)?.color;
-                      const urgentColor = daysLeft <= 1 ? "#EF4444" : daysLeft <= 3 ? "#F97316" : "#6366F1";
+                      const urgentColor = daysLeft <= 1 ? "#EF4444" : daysLeft <= 3 ? "#F97316" : N.accent;
                       return (
-                        <div key={exam.id} className="flex items-center gap-3 p-3 rounded-xl transition-colors"
-                          style={{ background: N.hover, border: `1px solid ${N.border}` }}>
+                        <div key={exam.id} className="flex items-center gap-3 py-3"
+                          style={{ borderBottom: `1px solid ${N.border}` }}>
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: subColor ?? urgentColor }} />
                           <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-semibold truncate" style={{ color: N.text }}>{exam.name}</p>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              {subColor && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: subColor }} />}
-                              {exam.subject && <span className="text-[11px] truncate" style={{ color: N.muted }}>{exam.subject}</span>}
-                              <span className="text-[11px]" style={{ color: N.muted }}>· {exam.deadline}</span>
-                            </div>
+                            <p className="text-[14px] font-medium truncate" style={{ color: N.text }}>{exam.name}</p>
+                            {exam.subject && (
+                              <p className="text-[12px] mt-0.5" style={{ color: N.muted }}>{exam.subject}</p>
+                            )}
                           </div>
-                          <div className="flex-shrink-0 text-right">
-                            <span className="text-[13px] font-bold px-2 py-0.5 rounded-lg"
-                              style={{ background: urgentColor + "18", color: urgentColor }}>
-                              {daysLeft === 0 ? "Today!" : daysLeft === 1 ? "Tomorrow" : `${daysLeft}d`}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Study Progress */}
-              <div className="rounded-2xl p-5" style={{ background: "white", boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-[15px] font-bold" style={{ color: N.text }}>Study Progress</h2>
-                  <button onClick={() => setModal("study")}
-                    className="flex items-center gap-1 text-[12px] font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                    style={{ background: N.hover, color: N.text }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = N.active)}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = N.hover)}>
-                    <Ico.plus /> Log
-                  </button>
-                </div>
-                <WeeklyBarChart studyLogs={studyLogs} />
-                {subjects.length > 0 && (
-                  <div className="mt-4 space-y-2 pt-3" style={{ borderTop: `1px solid ${N.border}` }}>
-                    {subjects.map((s) => {
-                      const logged = weeklyHours[s.id] ?? 0;
-                      return (
-                        <div key={s.id} className="flex items-center gap-2.5">
-                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                          <span className="text-[12px] flex-1 truncate" style={{ color: N.text }}>{s.name}</span>
-                          <span className="text-[12px] font-semibold tabular-nums"
-                            style={{ color: logged > 0 ? N.accent : N.muted }}>
-                            {logged > 0 ? `${logged.toFixed(1)}h` : "—"}
+                          <span className="text-[12px] font-bold flex-shrink-0" style={{ color: urgentColor }}>
+                            {daysLeft === 0 ? "Today!" : daysLeft === 1 ? "Tomorrow" : `${daysLeft}d`}
                           </span>
                         </div>
                       );
                     })}
-                    <div className="flex items-center justify-between pt-2" style={{ borderTop: `1px solid ${N.border}` }}>
-                      <span className="text-[11px]" style={{ color: N.muted }}>Total this week</span>
-                      <span className="text-[13px] font-bold" style={{ color: N.text }}>
-                        {totalHrsThisWeek.toFixed(1)}h
-                      </span>
-                    </div>
                   </div>
-                )}
-                {subjects.length === 0 && (
-                  <p className="text-[12px] mt-2" style={{ color: N.muted }}>Create a semester to track study progress</p>
                 )}
               </div>
 
               {/* Calendar */}
-              <div className="rounded-2xl p-5" style={{ background: "white", boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-[15px] font-bold" style={{ color: N.text }}>Calendar</h2>
-                  <button onClick={() => setModal("event")}
-                    className="flex items-center gap-1 text-[12px] font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                    style={{ background: N.hover, color: N.text }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = N.active)}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = N.hover)}>
-                    <Ico.plus /> Event
-                  </button>
-                </div>
+              <div>
+                <SectionTitle label="Calendar"
+                  action={
+                    <button onClick={() => setModal("event")}
+                      className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-colors flex-shrink-0"
+                      style={{ color: N.accent }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = N.accentBg)}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                      <Ico.plus /> Event
+                    </button>
+                  }
+                />
                 <WeekStrip
                   weekOffset={weekOffset} setWeekOffset={setWeekOffset}
                   selectedDate={selectedDate} onSelectDate={setSelectedDate}
                   eventCounts={eventCounts}
                 />
                 {selectedEvents.length > 0 ? (
-                  <div className="mt-3 space-y-1.5">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: N.muted }}>
-                      {selObj.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                    </p>
+                  <div className="mt-3">
                     {selectedEvents.map((ev) => {
                       const t = TYPES[ev.type] ?? TYPES.personal;
                       return (
-                        <div key={ev.id}
-                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-colors group"
-                          style={{ background: t.bg }}>
+                        <div key={ev.id} className="flex items-center gap-3 py-2.5 group"
+                          style={{ borderBottom: `1px solid ${N.border}` }}>
                           <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: t.accent }} />
-                          <span className="flex-1 text-[12px] font-medium truncate" style={{ color: N.text }}>{ev.title}</span>
-                          <span className="text-[10px] font-semibold flex-shrink-0" style={{ color: t.text }}>{t.label}</span>
+                          <span className="flex-1 text-[13px] truncate" style={{ color: N.text }}>{ev.title}</span>
+                          <span className="text-[11px] flex-shrink-0" style={{ color: N.muted }}>
+                            {ev.start_time ? formatTime(ev.start_time) : "All day"}
+                          </span>
                           <button onClick={() => deleteEvent(ev.id)}
                             className="opacity-0 group-hover:opacity-100 transition-opacity"
                             style={{ color: N.muted }}
@@ -1778,15 +1767,57 @@ export default function Home() {
                     })}
                   </div>
                 ) : (
-                  <p className="text-[12px] text-center py-3 mt-2" style={{ color: N.muted }}>
+                  <p className="text-[13px] mt-3" style={{ color: N.muted }}>
                     No events · {selObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </p>
                 )}
               </div>
 
-              {/* Pomodoro */}
-              <div className="rounded-2xl p-5" style={{ background: "white", boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
-                <h2 className="text-[14px] font-bold mb-3" style={{ color: N.text }}>Focus Timer</h2>
+              {/* Study Progress */}
+              <div>
+                <SectionTitle label="Study Progress"
+                  action={
+                    <button onClick={() => setModal("study")}
+                      className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-colors flex-shrink-0"
+                      style={{ color: N.accent }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = N.accentBg)}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                      <Ico.plus /> Log
+                    </button>
+                  }
+                />
+                <WeeklyBarChart studyLogs={studyLogs} />
+                {subjects.length > 0 && (
+                  <div className="mt-4 space-y-0">
+                    {subjects.map((s) => {
+                      const logged = weeklyHours[s.id] ?? 0;
+                      return (
+                        <div key={s.id} className="flex items-center gap-3 py-2.5"
+                          style={{ borderBottom: `1px solid ${N.border}` }}>
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                          <span className="text-[13px] flex-1 truncate" style={{ color: N.text }}>{s.name}</span>
+                          <span className="text-[13px] font-semibold tabular-nums"
+                            style={{ color: logged > 0 ? N.accent : N.muted }}>
+                            {logged > 0 ? `${logged.toFixed(1)}h` : "—"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {totalHrsThisWeek > 0 && (
+                      <p className="text-[12px] pt-3" style={{ color: N.muted }}>
+                        {totalHrsThisWeek.toFixed(1)}h total this week
+                      </p>
+                    )}
+                  </div>
+                )}
+                {subjects.length === 0 && (
+                  <p className="text-[13px] mt-2" style={{ color: N.muted }}>Create a semester to track study time</p>
+                )}
+              </div>
+
+              {/* Focus Timer */}
+              <div>
+                <SectionTitle label="Focus Timer" />
                 <PomodoroTimer />
               </div>
 
