@@ -45,16 +45,16 @@ const DAYS_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 const N = {
-  bg:       "#F3F8FE",
-  sidebar:  "#E6F0FB",
-  text:     "#1A2D45",
-  muted:    "#6E90B0",
-  border:   "#C8D9EE",
-  hover:    "#DDE9F8",
-  active:   "#C5D9F0",
-  selected: "#B8D0F2",
-  accent:   "#3B7ED8",
-  accentBg: "#EBF3FF",
+  bg:       "#F8F9FA",
+  sidebar:  "#FFFFFF",
+  text:     "#1E293B",
+  muted:    "#7A8FA3",
+  border:   "#E2E8EF",
+  hover:    "#F1F5F9",
+  active:   "#E2ECF5",
+  selected: "#D1E4F0",
+  accent:   "#3C96D9",
+  accentBg: "#EDF5FB",
 };
 
 const TYPES: Record<EventType, { label: string; bg: string; text: string; accent: string }> = {

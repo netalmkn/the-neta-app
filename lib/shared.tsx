@@ -73,16 +73,16 @@ export function formatTime(t: string) {
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 export const N = {
-  bg:       "#EFF7FF",
-  sidebar:  "#E1F0FC",
-  text:     "#1B2E45",
-  muted:    "#6A8FAD",
-  border:   "#BAD4E8",
-  hover:    "#D5E9F8",
-  active:   "#BDD9F4",
-  selected: "#A5CCEE",
+  bg:       "#F8F9FA",
+  sidebar:  "#FFFFFF",
+  text:     "#1E293B",
+  muted:    "#7A8FA3",
+  border:   "#E2E8EF",
+  hover:    "#F1F5F9",
+  active:   "#E2ECF5",
+  selected: "#D1E4F0",
   accent:   "#3C96D9",
-  accentBg: "#E5F3FF",
+  accentBg: "#EDF5FB",
 };
 
 // ─── Type config ──────────────────────────────────────────────────────────────

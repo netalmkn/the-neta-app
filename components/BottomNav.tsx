@@ -86,7 +86,7 @@ export default function BottomNav() {
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 flex border-t"
-      style={{ background: "#EFF7FF", borderColor: "#BAD4E8" }}
+      style={{ background: "#FFFFFF", borderColor: "#E2E8EF" }}
     >
       {tabs.map(({ href, label, icon }) => {
         const active = pathname === href;
@@ -95,7 +95,7 @@ export default function BottomNav() {
             key={href}
             href={href}
             className="flex flex-1 flex-col items-center gap-1 py-3 transition-colors"
-            style={{ color: active ? "#3C96D9" : "#93C5E8" }}
+            style={{ color: active ? "#3C96D9" : "#9EB3C4" }}
           >
             {icon(active)}
             <span className="text-[10px] font-semibold tracking-wide">
