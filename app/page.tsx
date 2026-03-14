@@ -225,12 +225,13 @@ const Ico = {
 
 // ─── Semester Picker ──────────────────────────────────────────────────────────
 
-function SemesterPicker({ semesters, activeSemesterId, onSwitch, onCreate, onDelete }: {
+function SemesterPicker({ semesters, activeSemesterId, onSwitch, onCreate, onDelete, onEdit }: {
   semesters: Semester[];
   activeSemesterId: string | null;
   onSwitch: (id: string) => void;
   onCreate: () => void;
   onDelete: (id: string) => void;
+  onEdit?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -279,6 +280,18 @@ function SemesterPicker({ semesters, activeSemesterId, onSwitch, onCreate, onDel
             </div>
           ))}
           <Divider />
+          {onEdit && activeSemesterId && (
+            <button onClick={() => { onEdit(); setOpen(false); }}
+              className="w-full text-left px-3 py-1.5 text-[13px] transition-colors flex items-center gap-1.5"
+              style={{ color: N.muted }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = N.hover)}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                <path d="M11 4H4C3.47 4 2.96 4.21 2.59 4.59C2.21 4.96 2 5.47 2 6V20C2 20.53 2.21 21.04 2.59 21.41C2.96 21.79 3.47 22 4 22H18C18.53 22 19.04 21.79 19.41 21.41C19.79 21.04 20 20.53 20 20V13M18.5 2.5C18.9 2.1 19.44 1.88 20 1.88C20.56 1.88 21.1 2.1 21.5 2.5C21.9 2.9 22.12 3.44 22.12 4C22.12 4.56 21.9 5.1 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Edit courses
+            </button>
+          )}
           <button onClick={() => { onCreate(); setOpen(false); }}
             className="w-full text-left px-3 py-1.5 text-[13px] transition-colors"
             style={{ color: N.accent }}
@@ -310,12 +323,13 @@ const NAV_ICONS_MAP: Record<string, React.ReactNode> = {
   "/calendar": <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.6"/><path d="M8 2V6M16 2V6M3 10H21" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/><path d="M8 14H8.01M12 14H12.01M16 14H16.01M8 18H8.01M12 18H12.01" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/></svg>,
 };
 
-function SidebarContent({ semesters, activeSemesterId, onSwitchSemester, onCreateSemester, onDeleteSemester, onClose }: {
+function SidebarContent({ semesters, activeSemesterId, onSwitchSemester, onCreateSemester, onDeleteSemester, onEditSemester, onClose }: {
   semesters: Semester[];
   activeSemesterId: string | null;
   onSwitchSemester: (id: string) => void;
   onCreateSemester: () => void;
   onDeleteSemester: (id: string) => void;
+  onEditSemester?: () => void;
   onClose?: () => void;
 }) {
   const pathname = usePathname();
@@ -347,6 +361,7 @@ function SidebarContent({ semesters, activeSemesterId, onSwitchSemester, onCreat
           onSwitch={onSwitchSemester}
           onCreate={onCreateSemester}
           onDelete={onDeleteSemester}
+          onEdit={onEditSemester}
         />
       </div>
 
@@ -478,6 +493,107 @@ function CreateSemesterModal({ onClose, onCreate }: {
             style={{ background: N.text, color: "white" }}>
             {saving ? "Creating…" : "Create Semester"}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Edit Semester Modal ──────────────────────────────────────────────────────
+
+function EditSemesterModal({ semesterName, existingSubjects, onClose, onAddSubjects }: {
+  semesterName: string;
+  existingSubjects: SemesterSubject[];
+  onClose: () => void;
+  onAddSubjects: (subjects: { name: string; credits: number; color: string }[]) => Promise<void>;
+}) {
+  const [newSubjects, setNewSubjects] = useState([
+    { name: "", credits: 4, color: SUBJECT_COLORS[existingSubjects.length % SUBJECT_COLORS.length] },
+  ]);
+  const [saving, setSaving] = useState(false);
+
+  const update = (i: number, field: string, value: string | number) =>
+    setNewSubjects((p) => p.map((s, idx) => idx === i ? { ...s, [field]: value } : s));
+
+  const handleSave = async () => {
+    const valid = newSubjects.filter((s) => s.name.trim());
+    if (!valid.length) return;
+    setSaving(true);
+    await onAddSubjects(valid);
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end lg:items-center lg:justify-center">
+      <div className="overlay-enter absolute inset-0 bg-black/20" onClick={onClose} />
+      <div className="modal-enter relative w-full lg:max-w-lg rounded-t-2xl lg:rounded-xl overflow-y-auto"
+        style={{ background: N.bg, border: `1px solid ${N.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.14)", maxHeight: "92vh" }}>
+        <div className="w-8 h-1 rounded-full mx-auto mt-3 lg:hidden" style={{ background: N.border }} />
+        <div className="px-6 py-5">
+          <h3 className="text-[18px] font-bold mb-1" style={{ color: N.text }}>Edit Semester</h3>
+          <p className="text-[13px] mb-5" style={{ color: N.muted }}>{semesterName}</p>
+
+          {/* Existing subjects — read-only */}
+          {existingSubjects.length > 0 && (
+            <div className="mb-5">
+              <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: N.muted }}>Current Courses</p>
+              <div className="space-y-1.5">
+                {existingSubjects.map((s) => (
+                  <div key={s.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg"
+                    style={{ background: N.hover }}>
+                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                    <span className="text-[13px] flex-1" style={{ color: N.text }}>{s.name}</span>
+                    <span className="text-[11px]" style={{ color: N.muted }}>{s.credits} cr</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Add new subjects */}
+          <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: N.muted }}>Add Courses</p>
+          <div className="space-y-2 mb-3">
+            {newSubjects.map((s, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <ColorPicker value={s.color} onChange={(c) => update(i, "color", c)} />
+                <input type="text" placeholder={`Course name`} value={s.name}
+                  onChange={(e) => update(i, "name", e.target.value)}
+                  className="flex-1 px-3 py-1.5 rounded-lg text-[13px] outline-none"
+                  style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
+                <input type="number" min="1" max="20" value={s.credits}
+                  onChange={(e) => update(i, "credits", Number(e.target.value))}
+                  className="w-12 px-2 py-1.5 rounded-lg text-[12px] text-center outline-none"
+                  style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
+                <span className="text-[10px]" style={{ color: N.muted }}>cr</span>
+                <button onClick={() => setNewSubjects((p) => p.filter((_, idx) => idx !== i))}
+                  className="transition-colors" style={{ color: N.muted }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = N.muted)}>
+                  <Ico.x />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => setNewSubjects((p) => [...p, { name: "", credits: 4, color: SUBJECT_COLORS[(existingSubjects.length + p.length) % SUBJECT_COLORS.length] }])}
+            className="w-full py-1.5 rounded-lg text-[12px] mb-5 transition-colors border-dashed border"
+            style={{ borderColor: N.border, color: N.muted }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = N.hover)}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+            + Add course
+          </button>
+
+          <div className="flex gap-2">
+            <button onClick={onClose}
+              className="flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition-colors"
+              style={{ background: N.hover, color: N.text }}>
+              Cancel
+            </button>
+            <button onClick={handleSave} disabled={saving || !newSubjects.some((s) => s.name.trim())}
+              className="flex-1 py-2.5 rounded-lg text-[13px] font-semibold transition-colors disabled:opacity-50"
+              style={{ background: N.text, color: "white" }}>
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -996,7 +1112,7 @@ export default function Home() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [modal, setModal] = useState<null | "task" | "exam" | "event" | "study" | "semester">(null);
+  const [modal, setModal] = useState<null | "task" | "exam" | "event" | "study" | "semester" | "editSemester">(null);
   const [showDone, setShowDone] = useState(false);
 
   useEffect(() => {
@@ -1050,6 +1166,14 @@ export default function Home() {
     setModal(null);
   };
 
+  const addSubjectsToSemester = async (newSubjects: { name: string; credits: number; color: string }[]) => {
+    if (!activeSemesterId) return;
+    const { data } = await supabase.from("semester_subjects")
+      .insert(newSubjects.map((s) => ({ ...s, semester_id: activeSemesterId }))).select();
+    if (data) setSubjects((p) => [...p, ...(data as SemesterSubject[])]);
+    setModal(null);
+  };
+
   const deleteSemester = async (id: string) => {
     await supabase.from("semesters").delete().eq("id", id);
     setSemesters((p) => {
@@ -1100,10 +1224,12 @@ export default function Home() {
   };
 
   // ── Derived ──
-  const undoneTasks = useMemo(() => tasks.filter((t) => !t.done), [tasks]);
+  const weekAgoStr = useMemo(() => { const d = new Date(); d.setDate(d.getDate() - 7); return toDateStr(d); }, []);
+  const isVisible  = (t: Task) => !t.done && (t.deadline === "No deadline" || t.deadline >= weekAgoStr);
+  const undoneTasks = useMemo(() => tasks.filter(isVisible), [tasks, weekAgoStr]);
   const doneTasks   = useMemo(() => tasks.filter((t) => t.done),  [tasks]);
-  const exams       = useMemo(() => tasks.filter((t) => t.type === "exam"     && !t.done), [tasks]);
-  const homework    = useMemo(() => tasks.filter((t) => t.type === "homework" && !t.done), [tasks]);
+  const exams       = useMemo(() => tasks.filter((t) => t.type === "exam"     && isVisible(t)), [tasks, weekAgoStr]);
+  const homework    = useMemo(() => tasks.filter((t) => t.type === "homework" && isVisible(t)), [tasks, weekAgoStr]);
 
   const eventCounts = useMemo(() => {
     const m: Record<string, number> = {};
@@ -1156,7 +1282,7 @@ export default function Home() {
         <SidebarContent
           semesters={semesters} activeSemesterId={activeSemesterId}
           onSwitchSemester={switchSemester} onCreateSemester={() => setModal("semester")}
-          onDeleteSemester={deleteSemester}
+          onDeleteSemester={deleteSemester} onEditSemester={() => setModal("editSemester")}
         />
       </aside>
 
@@ -1171,6 +1297,7 @@ export default function Home() {
               onSwitchSemester={switchSemester}
               onCreateSemester={() => { setModal("semester"); setDrawerOpen(false); }}
               onDeleteSemester={deleteSemester}
+              onEditSemester={() => { setModal("editSemester"); setDrawerOpen(false); }}
               onClose={() => setDrawerOpen(false)}
             />
           </aside>
@@ -1431,7 +1558,15 @@ export default function Home() {
       </div>
 
       {/* ── Modals ── */}
-      {modal === "semester" && <CreateSemesterModal onClose={() => setModal(null)} onCreate={createSemester} />}
+      {modal === "semester"     && <CreateSemesterModal onClose={() => setModal(null)} onCreate={createSemester} />}
+      {modal === "editSemester" && activeSemesterId && (
+        <EditSemesterModal
+          semesterName={activeSemesterName ?? ""}
+          existingSubjects={subjects}
+          onClose={() => setModal(null)}
+          onAddSubjects={addSubjectsToSemester}
+        />
+      )}
       {modal === "task"     && <AddTaskModal onClose={() => setModal(null)} onAdd={addTask} defaultType="homework" subjects={subjects} />}
       {modal === "exam"     && <AddTaskModal onClose={() => setModal(null)} onAdd={addTask} defaultType="exam" subjects={subjects} />}
       {modal === "event"    && <AddEventModal date={selectedDate} onClose={() => setModal(null)} onAdd={addEvent} />}
