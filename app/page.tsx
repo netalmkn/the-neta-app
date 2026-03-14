@@ -28,6 +28,14 @@ interface CalendarEvent {
   created_at?: string;
 }
 
+interface StudyLog {
+  id: string;
+  subject: string;
+  hours: number;
+  date: string;
+  created_at?: string;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function toDateStr(d: Date) {
@@ -82,13 +90,12 @@ const TYPES: Record<EventType, { label: string; bg: string; text: string; accent
 
 const SHADOW = "0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)";
 
-// Dummy study data
-const STUDY_SUBJECTS = [
-  { name: "C Programming",          hours: 2.0, target: 5,  color: "#93C5FD" },
-  { name: "Logic & Set Theory",     hours: 1.5, target: 4,  color: "#C4B5FD" },
-  { name: "Data Structures",        hours: 3.0, target: 5,  color: "#86EFAC" },
-  { name: "Calculus 2",             hours: 1.0, target: 4,  color: "#FCA5A5" },
-  { name: "Linear Algebra 2",       hours: 2.5, target: 4,  color: "#FDE68A" },
+const SUBJECTS = [
+  { name: "C Programming",      target: 5, color: "#93C5FD" },
+  { name: "Logic & Set Theory", target: 4, color: "#C4B5FD" },
+  { name: "Data Structures",    target: 5, color: "#86EFAC" },
+  { name: "Calculus 2",         target: 4, color: "#FCA5A5" },
+  { name: "Linear Algebra 2",   target: 4, color: "#FDE68A" },
 ];
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -248,31 +255,129 @@ function PomodoroTimer() {
   );
 }
 
+// ─── Log Study Modal ──────────────────────────────────────────────────────────
+
+function LogStudyModal({ onClose, onLog }: {
+  onClose: () => void;
+  onLog: (subject: string, hours: number, date: string) => Promise<void>;
+}) {
+  const [subject, setSubject] = useState(SUBJECTS[0].name);
+  const [hours, setHours] = useState("1");
+  const [date, setDate] = useState(toDateStr(new Date()));
+  const [saving, setSaving] = useState(false);
+
+  const handleLog = async () => {
+    const h = parseFloat(hours);
+    if (!h || h <= 0) return;
+    setSaving(true);
+    await onLog(subject, h, date);
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end lg:items-center lg:justify-center">
+      <div className="overlay-enter absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="modal-enter relative w-full lg:max-w-md bg-white rounded-t-3xl lg:rounded-2xl px-5 pt-5 pb-10 lg:pb-6 shadow-2xl">
+        <div className="w-10 h-1 rounded-full mx-auto mb-6 lg:hidden" style={{ background: "#E5E7EB" }} />
+        <h3 className="text-[20px] font-bold mb-5" style={{ color: "#111827" }}>Log Study Session</h3>
+        <div className="space-y-3">
+          {/* Subject */}
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: "#9CA3AF" }}>Subject</p>
+            <div className="grid grid-cols-1 gap-1.5">
+              {SUBJECTS.map((s) => (
+                <button key={s.name} onClick={() => setSubject(s.name)}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium text-left transition active:scale-95"
+                  style={{
+                    background: subject === s.name ? s.color + "40" : "#F9FAFB",
+                    border: subject === s.name ? `2px solid ${s.color}` : "2px solid transparent",
+                    color: "#111827",
+                  }}>
+                  <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Hours */}
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: "#9CA3AF" }}>Hours studied</p>
+            <div className="flex items-center gap-2">
+              {[0.5, 1, 1.5, 2, 3].map((h) => (
+                <button key={h} onClick={() => setHours(String(h))}
+                  className="flex-1 py-2 rounded-xl text-[12px] font-semibold transition active:scale-95"
+                  style={{
+                    background: hours === String(h) ? "#6366F1" : "#F3F4F6",
+                    color: hours === String(h) ? "white" : "#6B7280",
+                  }}>
+                  {h}h
+                </button>
+              ))}
+            </div>
+            <input type="number" min="0.1" max="12" step="0.1" placeholder="Custom…" value={hours}
+              onChange={(e) => setHours(e.target.value)}
+              className="mt-2 w-full rounded-xl px-4 py-2.5 text-[13px] outline-none"
+              style={{ background: "#F9FAFB", border: "1.5px solid #E5E7EB", color: "#111827" }} />
+          </div>
+          {/* Date */}
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: "#9CA3AF" }}>Date</p>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+              className="w-full rounded-xl px-4 py-2.5 text-[13px] outline-none"
+              style={{ background: "#F9FAFB", border: "1.5px solid #E5E7EB", color: "#111827" }} />
+          </div>
+          <button onClick={handleLog} disabled={saving || !hours || parseFloat(hours) <= 0}
+            className="w-full py-3.5 rounded-xl text-[14px] font-semibold transition active:scale-[0.98] disabled:opacity-50"
+            style={{ background: "#6366F1", color: "white" }}>
+            {saving ? "Saving…" : "Log Session"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Right Panel ──────────────────────────────────────────────────────────────
 
-function RightPanel({ tasksDoneThisWeek }: { tasksDoneThisWeek: number }) {
+function RightPanel({ tasksDoneThisWeek, weeklyHours, streak, onLogStudy }: {
+  tasksDoneThisWeek: number;
+  weeklyHours: Record<string, number>;
+  streak: number;
+  onLogStudy: () => void;
+}) {
   return (
     <div className="flex flex-col h-full overflow-y-auto">
       <PomodoroTimer />
 
       {/* Study progress */}
       <div className="px-5 py-4 border-b" style={{ borderColor: "#F3F4F6" }}>
-        <p className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: "#9CA3AF" }}>
-          Weekly Study Progress
-        </p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#9CA3AF" }}>
+            Weekly Study Progress
+          </p>
+          <button onClick={onLogStudy}
+            className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg transition active:scale-95"
+            style={{ background: "#EEF2FF", color: "#6366F1" }}>
+            <Icon.plusSm /> Log
+          </button>
+        </div>
         <div className="space-y-3">
-          {STUDY_SUBJECTS.map((s) => (
-            <div key={s.name}>
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[12px] font-medium" style={{ color: "#374151" }}>{s.name}</span>
-                <span className="text-[11px] tabular-nums" style={{ color: "#9CA3AF" }}>{s.hours}h / {s.target}h</span>
+          {SUBJECTS.map((s) => {
+            const logged = weeklyHours[s.name] ?? 0;
+            const pct = Math.min((logged / s.target) * 100, 100);
+            return (
+              <div key={s.name}>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[12px] font-medium" style={{ color: "#374151" }}>{s.name}</span>
+                  <span className="text-[11px] tabular-nums" style={{ color: "#9CA3AF" }}>{logged}h / {s.target}h</span>
+                </div>
+                <div className="h-1.5 rounded-full" style={{ background: "#F3F4F6" }}>
+                  <div className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${pct}%`, background: s.color }} />
+                </div>
               </div>
-              <div className="h-1.5 rounded-full" style={{ background: "#F3F4F6" }}>
-                <div className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${(s.hours / s.target) * 100}%`, background: s.color }} />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -296,7 +401,7 @@ function RightPanel({ tasksDoneThisWeek }: { tasksDoneThisWeek: number }) {
               <Icon.fire />
             </div>
             <div>
-              <p className="text-[18px] font-bold leading-none" style={{ color: "#C2410C" }}>5</p>
+              <p className="text-[18px] font-bold leading-none" style={{ color: "#C2410C" }}>{streak}</p>
               <p className="text-[11px]" style={{ color: "#C2410C", opacity: 0.7 }}>day streak</p>
             </div>
           </div>
@@ -557,11 +662,12 @@ export default function Home() {
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [studyLogs, setStudyLogs] = useState<StudyLog[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [modal, setModal] = useState<null | "task" | "exam" | "event">(null);
+  const [modal, setModal] = useState<null | "task" | "exam" | "event" | "study">(null);
 
   useEffect(() => {
     supabase.from("tasks").select("*").order("created_at", { ascending: true })
@@ -571,6 +677,11 @@ export default function Home() {
   useEffect(() => {
     supabase.from("calendar_entries").select("*").order("start_time", { ascending: true })
       .then(({ data }) => { if (data) setEvents(data as CalendarEvent[]); });
+  }, []);
+
+  useEffect(() => {
+    supabase.from("study_logs").select("*").order("date", { ascending: false })
+      .then(({ data }) => { if (data) setStudyLogs(data as StudyLog[]); });
   }, []);
 
   const toggleTask = async (id: string) => {
@@ -598,6 +709,12 @@ export default function Home() {
     await supabase.from("calendar_entries").delete().eq("id", id);
   };
 
+  const addStudyLog = async (subject: string, hours: number, date: string) => {
+    const { data } = await supabase.from("study_logs").insert({ subject, hours, date }).select().single();
+    if (data) setStudyLogs((p) => [data as StudyLog, ...p]);
+    setModal(null);
+  };
+
   // Derived data
   const undoneTasks = useMemo(() => tasks.filter((t) => !t.done), [tasks]);
   const doneTasks = useMemo(() => tasks.filter((t) => t.done), [tasks]);
@@ -613,6 +730,36 @@ export default function Home() {
     [events, selectedDate]
   );
   const tasksDoneThisWeek = doneTasks.length;
+
+  // Current week bounds (Mon–Sun)
+  const weeklyHours = useMemo(() => {
+    const now = new Date();
+    const mon = new Date(now);
+    mon.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    mon.setHours(0, 0, 0, 0);
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    sun.setHours(23, 59, 59, 999);
+    const map: Record<string, number> = {};
+    studyLogs.forEach((l) => {
+      const d = new Date(l.date + "T12:00:00");
+      if (d >= mon && d <= sun) map[l.subject] = (map[l.subject] ?? 0) + l.hours;
+    });
+    return map;
+  }, [studyLogs]);
+
+  const streak = useMemo(() => {
+    const days = new Set(studyLogs.map((l) => l.date));
+    let count = 0;
+    const d = new Date();
+    // If today has no logs yet, still count streak from yesterday
+    if (!days.has(toDateStr(d))) d.setDate(d.getDate() - 1);
+    while (days.has(toDateStr(d))) {
+      count++;
+      d.setDate(d.getDate() - 1);
+    }
+    return count;
+  }, [studyLogs]);
 
   const [selY, selM, selD] = selectedDate.split("-").map(Number);
   const selObj = new Date(selY, selM - 1, selD);
@@ -792,7 +939,12 @@ export default function Home() {
         <div className="px-5 py-5 border-b" style={{ borderColor: "#F3F4F6" }}>
           <p className="text-[14px] font-bold" style={{ color: "#111827" }}>Focus Panel</p>
         </div>
-        <RightPanel tasksDoneThisWeek={tasksDoneThisWeek} />
+        <RightPanel
+          tasksDoneThisWeek={tasksDoneThisWeek}
+          weeklyHours={weeklyHours}
+          streak={streak}
+          onLogStudy={() => setModal("study")}
+        />
       </aside>
 
       {/* ── FAB ── */}
@@ -806,6 +958,7 @@ export default function Home() {
       {modal === "task" && <AddTaskModal onClose={() => setModal(null)} onAdd={addTask} defaultType="homework" />}
       {modal === "exam" && <AddTaskModal onClose={() => setModal(null)} onAdd={addTask} defaultType="exam" />}
       {modal === "event" && <AddEventModal date={selectedDate} onClose={() => setModal(null)} onAdd={addEvent} />}
+      {modal === "study" && <LogStudyModal onClose={() => setModal(null)} onLog={addStudyLog} />}
     </div>
   );
 }
