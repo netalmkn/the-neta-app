@@ -12,6 +12,8 @@ export interface Task {
   done: boolean;
   subject?: string | null;
   semester_id?: string | null;
+  total_questions?: number | null;
+  completed_questions?: number | null;
   created_at?: string;
 }
 
@@ -139,6 +141,28 @@ const NAV_ICONS: Record<string, () => React.ReactElement> = {
 };
 
 // ─── PropChip ─────────────────────────────────────────────────────────────────
+
+export function QuestionGrid({ total, completed, accent, onChange }: {
+  total: number; completed: number; accent: string; onChange: (n: number) => void;
+}) {
+  const cap = Math.min(total, 50);
+  return (
+    <div className="flex items-center flex-wrap gap-0.5 mt-1.5" onClick={(e) => e.stopPropagation()}>
+      {Array.from({ length: cap }).map((_, i) => {
+        const done = i < completed;
+        return (
+          <button key={i} onClick={() => onChange(done ? i : i + 1)}
+            className="w-3.5 h-3.5 rounded-sm transition-all active:scale-90"
+            style={{ background: done ? accent : "transparent", border: `1.5px solid ${done ? accent : N.border}` }} />
+        );
+      })}
+      {total > 50 && <span className="text-[10px] ml-0.5" style={{ color: N.muted }}>+{total - 50}</span>}
+      <span className="text-[11px] ml-1.5 tabular-nums font-medium" style={{ color: completed >= total && total > 0 ? accent : N.muted }}>
+        {completed}/{total}
+      </span>
+    </div>
+  );
+}
 
 export function PropChip({ children, bg, color }: { children: React.ReactNode; bg: string; color: string }) {
   return (

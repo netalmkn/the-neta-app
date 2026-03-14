@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
-import { N, TYPES, toDateStr, PropChip, Ico } from "@/lib/shared";
+import { N, TYPES, toDateStr, PropChip, Ico, QuestionGrid } from "@/lib/shared";
 import type { EventType, Task, Semester, SemesterSubject } from "@/lib/shared";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -139,7 +139,16 @@ function AddTaskModal({ onClose, onAdd, subjects }: {
   const [type, setType] = useState<EventType>("homework");
   const [deadline, setDeadline] = useState("");
   const [subject, setSubject] = useState(subjects[0]?.name ?? "");
+  const [questions, setQuestions] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    const q = parseInt(questions);
+    await onAdd({ name: name.trim(), type, deadline: deadline || "No deadline", subject: subject || null, total_questions: q > 0 ? q : null, completed_questions: q > 0 ? 0 : null });
+    setSaving(false);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end lg:items-center lg:justify-center">
@@ -150,7 +159,7 @@ function AddTaskModal({ onClose, onAdd, subjects }: {
         <div className="px-5 py-5 pb-10 lg:pb-5 space-y-3">
           <h3 className="text-[17px] font-bold" style={{ color: N.text }}>New Task</h3>
           <input autoFocus type="text" placeholder="Title" value={name}
-            onChange={(e) => setName(e.target.value)} onKeyDown={async (e) => { if (e.key === "Enter" && name.trim()) { setSaving(true); await onAdd({ name: name.trim(), type, deadline: deadline || "No deadline", subject: subject || null }); setSaving(false); } }}
+            onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()}
             className="w-full px-3 py-2.5 rounded-xl text-[14px] outline-none"
             style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
 
@@ -194,8 +203,17 @@ function AddTaskModal({ onClose, onAdd, subjects }: {
               style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
           </div>
 
-          <button onClick={async () => { if (!name.trim()) return; setSaving(true); await onAdd({ name: name.trim(), type, deadline: deadline || "No deadline", subject: subject || null }); setSaving(false); }}
-            disabled={saving || !name.trim()}
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>
+              Questions <span style={{ opacity: 0.5, textTransform: "none", letterSpacing: "normal" }}>(optional)</span>
+            </p>
+            <input type="number" min="1" max="999" placeholder="How many questions?" value={questions}
+              onChange={(e) => setQuestions(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl text-[13px] outline-none"
+              style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
+          </div>
+
+          <button onClick={save} disabled={saving || !name.trim()}
             className="w-full py-2.5 rounded-xl text-[13px] font-semibold disabled:opacity-40"
             style={{ background: N.text, color: "white" }}>
             {saving ? "Saving…" : "Add Task"}
@@ -208,48 +226,57 @@ function AddTaskModal({ onClose, onAdd, subjects }: {
 
 // ─── Task Row ─────────────────────────────────────────────────────────────────
 
-function TaskRow({ task, onToggle, onDelete, subjects }: {
-  task: Task; onToggle: (id: string) => void; onDelete: (id: string) => void; subjects: SemesterSubject[];
+function TaskRow({ task, onToggle, onDelete, onUpdateQuestions, subjects }: {
+  task: Task; onToggle: (id: string) => void; onDelete: (id: string) => void;
+  onUpdateQuestions?: (id: string, n: number) => void; subjects: SemesterSubject[];
 }) {
   const [hov, setHov] = useState(false);
   const t = TYPES[task.type] ?? TYPES.personal;
   const subColor = subjects.find((s) => s.name === task.subject)?.color;
+  const hasQ = (task.total_questions ?? 0) > 0;
 
   return (
     <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-      className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-colors border"
+      className="px-3 py-2.5 rounded-xl transition-colors border"
       style={{ background: hov ? N.hover : N.bg, borderColor: N.border }}>
-      <button onClick={() => onToggle(task.id)}
-        className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-all"
-        style={task.done ? { background: N.muted, borderColor: N.muted } : { background: "transparent", borderColor: N.border }}>
-        {task.done && <Ico.check />}
-      </button>
-      <div className="flex-1 min-w-0">
-        <p className="text-[13px] truncate" style={{ color: task.done ? N.muted : N.text, textDecoration: task.done ? "line-through" : "none" }}>
-          {task.name}
-        </p>
-        {task.subject && (
-          <p className="text-[11px] flex items-center gap-1 mt-0.5" style={{ color: N.muted }}>
-            {subColor && <span className="w-2 h-2 rounded-full inline-block flex-shrink-0" style={{ background: subColor }} />}
-            {task.subject}
+      <div className="flex items-center gap-2.5">
+        <button onClick={() => onToggle(task.id)}
+          className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-all"
+          style={task.done ? { background: N.muted, borderColor: N.muted } : { background: "transparent", borderColor: N.border }}>
+          {task.done && <Ico.check />}
+        </button>
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] truncate" style={{ color: task.done ? N.muted : N.text, textDecoration: task.done ? "line-through" : "none" }}>
+            {task.name}
           </p>
-        )}
+          {task.subject && (
+            <p className="text-[11px] flex items-center gap-1 mt-0.5" style={{ color: N.muted }}>
+              {subColor && <span className="w-2 h-2 rounded-full inline-block flex-shrink-0" style={{ background: subColor }} />}
+              {task.subject}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <PropChip bg={t.bg} color={t.text}>{t.label}</PropChip>
+          {task.deadline && task.deadline !== "No deadline" && (
+            <span className="text-[11px] hidden sm:flex items-center gap-1" style={{ color: N.muted }}>
+              <Ico.clock />{task.deadline}
+            </span>
+          )}
+          {hov && (
+            <button onClick={() => onDelete(task.id)} className="transition-colors" style={{ color: N.border }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = N.border)}>
+              <Ico.trash />
+            </button>
+          )}
+        </div>
       </div>
-      <div className="flex items-center gap-1.5 flex-shrink-0">
-        <PropChip bg={t.bg} color={t.text}>{t.label}</PropChip>
-        {task.deadline && task.deadline !== "No deadline" && (
-          <span className="text-[11px] hidden sm:flex items-center gap-1" style={{ color: N.muted }}>
-            <Ico.clock />{task.deadline}
-          </span>
-        )}
-        {hov && (
-          <button onClick={() => onDelete(task.id)} className="transition-colors" style={{ color: N.border }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = N.border)}>
-            <Ico.trash />
-          </button>
-        )}
-      </div>
+      {hasQ && onUpdateQuestions && !task.done && (
+        <div className="mt-1 ml-6">
+          <QuestionGrid total={task.total_questions!} completed={task.completed_questions ?? 0} accent={t.accent} onChange={(n) => onUpdateQuestions(task.id, n)} />
+        </div>
+      )}
     </div>
   );
 }
@@ -321,6 +348,11 @@ export default function TasksPage() {
   const deleteTask = async (id: string) => {
     setTasks((p) => p.filter((t) => t.id !== id));
     await supabase.from("tasks").delete().eq("id", id);
+  };
+
+  const updateTaskQuestions = async (id: string, completed: number) => {
+    setTasks((p) => p.map((t) => t.id === id ? { ...t, completed_questions: completed } : t));
+    await supabase.from("tasks").update({ completed_questions: completed }).eq("id", id);
   };
 
   const filtered = useMemo(() =>
@@ -422,7 +454,7 @@ export default function TasksPage() {
               <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: "#EA580C" }}>Due Today</p>
               <div className="space-y-2">
                 {undone.filter((t) => t.deadline === today).map((t) => (
-                  <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} subjects={subjects} />
+                  <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} subjects={subjects} />
                 ))}
               </div>
             </div>
@@ -445,7 +477,7 @@ export default function TasksPage() {
             ) : (
               <div className="space-y-2">
                 {undone.filter((t) => t.deadline !== today).map((t) => (
-                  <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} subjects={subjects} />
+                  <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} subjects={subjects} />
                 ))}
               </div>
             )}
@@ -465,7 +497,7 @@ export default function TasksPage() {
               {showDone && (
                 <div className="space-y-2 opacity-70">
                   {done.map((t) => (
-                    <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} subjects={subjects} />
+                    <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} subjects={subjects} />
                   ))}
                 </div>
               )}

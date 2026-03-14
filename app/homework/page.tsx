@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
-import { N, TYPES, toDateStr, PropChip, Ico } from "@/lib/shared";
+import { N, TYPES, toDateStr, PropChip, Ico, QuestionGrid } from "@/lib/shared";
 import type { EventType, Task, Semester, SemesterSubject } from "@/lib/shared";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -88,12 +88,14 @@ function AddHomeworkModal({ onClose, onAdd, subjects }: {
   const [name, setName] = useState("");
   const [deadline, setDeadline] = useState("");
   const [subject, setSubject] = useState(subjects[0]?.name ?? "");
+  const [questions, setQuestions] = useState("");
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    await onAdd({ name: name.trim(), type: "homework", deadline: deadline || "No deadline", subject: subject || null });
+    const q = parseInt(questions);
+    await onAdd({ name: name.trim(), type: "homework", deadline: deadline || "No deadline", subject: subject || null, total_questions: q > 0 ? q : null, completed_questions: q > 0 ? 0 : null });
     setSaving(false);
   };
 
@@ -123,6 +125,12 @@ function AddHomeworkModal({ onClose, onAdd, subjects }: {
             <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>Due date</p>
             <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-full px-3 py-2 rounded-xl text-[13px] outline-none" style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
           </div>
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>
+              Questions <span style={{ opacity: 0.5, textTransform: "none", letterSpacing: "normal" }}>(optional)</span>
+            </p>
+            <input type="number" min="1" max="999" placeholder="How many questions?" value={questions} onChange={(e) => setQuestions(e.target.value)} className="w-full px-3 py-2 rounded-xl text-[13px] outline-none" style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
+          </div>
           <button onClick={save} disabled={saving || !name.trim()} className="w-full py-2.5 rounded-xl text-[13px] font-semibold disabled:opacity-40" style={{ background: N.text, color: "white" }}>{saving ? "Saving…" : "Add Assignment"}</button>
         </div>
       </div>
@@ -130,24 +138,32 @@ function AddHomeworkModal({ onClose, onAdd, subjects }: {
   );
 }
 
-function TaskRow({ task, onToggle, onDelete, subjects }: { task: Task; onToggle: (id: string) => void; onDelete: (id: string) => void; subjects: SemesterSubject[] }) {
+function TaskRow({ task, onToggle, onDelete, onUpdateQuestions, subjects }: { task: Task; onToggle: (id: string) => void; onDelete: (id: string) => void; onUpdateQuestions?: (id: string, n: number) => void; subjects: SemesterSubject[] }) {
   const [hov, setHov] = useState(false);
   const t = TYPES[task.type] ?? TYPES.homework;
   const subColor = subjects.find((s) => s.name === task.subject)?.color;
+  const hasQ = (task.total_questions ?? 0) > 0;
   return (
-    <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-colors border" style={{ background: hov ? N.hover : N.bg, borderColor: N.border }}>
-      <button onClick={() => onToggle(task.id)} className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-all" style={task.done ? { background: N.muted, borderColor: N.muted } : { background: "transparent", borderColor: N.border }}>
-        {task.done && <Ico.check />}
-      </button>
-      <div className="flex-1 min-w-0">
-        <p className="text-[13px] truncate" style={{ color: task.done ? N.muted : N.text, textDecoration: task.done ? "line-through" : "none" }}>{task.name}</p>
-        {task.subject && <p className="text-[11px] flex items-center gap-1 mt-0.5" style={{ color: N.muted }}>{subColor && <span className="w-2 h-2 rounded-full inline-block" style={{ background: subColor }} />}{task.subject}</p>}
+    <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)} className="px-3 py-2.5 rounded-xl transition-colors border" style={{ background: hov ? N.hover : N.bg, borderColor: N.border }}>
+      <div className="flex items-center gap-2.5">
+        <button onClick={() => onToggle(task.id)} className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-all" style={task.done ? { background: N.muted, borderColor: N.muted } : { background: "transparent", borderColor: N.border }}>
+          {task.done && <Ico.check />}
+        </button>
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] truncate" style={{ color: task.done ? N.muted : N.text, textDecoration: task.done ? "line-through" : "none" }}>{task.name}</p>
+          {task.subject && <p className="text-[11px] flex items-center gap-1 mt-0.5" style={{ color: N.muted }}>{subColor && <span className="w-2 h-2 rounded-full inline-block" style={{ background: subColor }} />}{task.subject}</p>}
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <PropChip bg={t.bg} color={t.text}>{t.label}</PropChip>
+          {task.deadline && task.deadline !== "No deadline" && <span className="text-[11px] hidden sm:flex items-center gap-1" style={{ color: N.muted }}><Ico.clock />{task.deadline}</span>}
+          {hov && <button onClick={() => onDelete(task.id)} className="transition-colors" style={{ color: N.border }} onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")} onMouseLeave={(e) => (e.currentTarget.style.color = N.border)}><Ico.trash /></button>}
+        </div>
       </div>
-      <div className="flex items-center gap-1.5 flex-shrink-0">
-        <PropChip bg={t.bg} color={t.text}>{t.label}</PropChip>
-        {task.deadline && task.deadline !== "No deadline" && <span className="text-[11px] hidden sm:flex items-center gap-1" style={{ color: N.muted }}><Ico.clock />{task.deadline}</span>}
-        {hov && <button onClick={() => onDelete(task.id)} className="transition-colors" style={{ color: N.border }} onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")} onMouseLeave={(e) => (e.currentTarget.style.color = N.border)}><Ico.trash /></button>}
-      </div>
+      {hasQ && onUpdateQuestions && !task.done && (
+        <div className="mt-1 ml-6">
+          <QuestionGrid total={task.total_questions!} completed={task.completed_questions ?? 0} accent={t.accent} onChange={(n) => onUpdateQuestions(task.id, n)} />
+        </div>
+      )}
     </div>
   );
 }
@@ -204,6 +220,11 @@ export default function HomeworkPage() {
   const deleteTask = async (id: string) => {
     setTasks((p) => p.filter((t) => t.id !== id));
     await supabase.from("tasks").delete().eq("id", id);
+  };
+
+  const updateTaskQuestions = async (id: string, completed: number) => {
+    setTasks((p) => p.map((t) => t.id === id ? { ...t, completed_questions: completed } : t));
+    await supabase.from("tasks").update({ completed_questions: completed }).eq("id", id);
   };
 
   const filtered = useMemo(() => filterSubject ? tasks.filter((t) => t.subject === filterSubject) : tasks, [tasks, filterSubject]);
@@ -265,7 +286,7 @@ export default function HomeworkPage() {
             </div>
             {loading ? [1,2,3].map((i) => <div key={i} className="h-12 rounded-xl animate-pulse mb-2" style={{ background: N.hover }} />) :
               undone.length === 0 ? <p className="text-[13px] py-6 text-center rounded-2xl" style={{ color: N.muted, background: N.hover }}>No pending assignments</p> :
-              <div className="space-y-2">{undone.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} subjects={subjects} />)}</div>
+              <div className="space-y-2">{undone.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} subjects={subjects} />)}</div>
             }
           </div>
 
@@ -275,7 +296,7 @@ export default function HomeworkPage() {
                 <span style={{ transform: showDone ? "rotate(90deg)" : "none", transition: "transform 0.15s", display: "inline-block" }}><Ico.chevR /></span>
                 {done.length} completed
               </button>
-              {showDone && <div className="space-y-2 opacity-70">{done.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} subjects={subjects} />)}</div>}
+              {showDone && <div className="space-y-2 opacity-70">{done.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} subjects={subjects} />)}</div>}
             </div>
           )}
         </div>

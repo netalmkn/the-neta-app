@@ -17,6 +17,8 @@ interface Task {
   done: boolean;
   subject?: string | null;
   semester_id?: string | null;
+  total_questions?: number | null;
+  completed_questions?: number | null;
   created_at?: string;
 }
 
@@ -222,6 +224,28 @@ const Ico = {
   chevR:  () => <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>,
   clock:  () => <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/><path d="M12 7V12.5L15 14.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>,
 };
+
+function QuestionGrid({ total, completed, accent, onChange }: {
+  total: number; completed: number; accent: string; onChange: (n: number) => void;
+}) {
+  const cap = Math.min(total, 50);
+  return (
+    <div className="flex items-center flex-wrap gap-0.5 mt-1.5" onClick={(e) => e.stopPropagation()}>
+      {Array.from({ length: cap }).map((_, i) => {
+        const done = i < completed;
+        return (
+          <button key={i} onClick={() => onChange(done ? i : i + 1)}
+            className="w-3.5 h-3.5 rounded-sm transition-all active:scale-90"
+            style={{ background: done ? accent : "transparent", border: `1.5px solid ${done ? accent : N.border}` }} />
+        );
+      })}
+      {total > 50 && <span className="text-[10px] ml-0.5" style={{ color: N.muted }}>+{total - 50}</span>}
+      <span className="text-[11px] ml-1.5 tabular-nums font-medium" style={{ color: completed >= total && total > 0 ? accent : N.muted }}>
+        {completed}/{total}
+      </span>
+    </div>
+  );
+}
 
 // ─── Semester Picker ──────────────────────────────────────────────────────────
 
@@ -764,51 +788,67 @@ function LogStudyModal({ subjects, onClose, onLog }: {
 
 // ─── Task Row (Notion database style) ────────────────────────────────────────
 
-function TaskRow({ task, onToggle, onDelete }: {
+function TaskRow({ task, onToggle, onDelete, onUpdateQuestions }: {
   task: Task;
   onToggle: (id: string) => void;
   onDelete?: (id: string) => void;
+  onUpdateQuestions?: (id: string, n: number) => void;
 }) {
   const [hov, setHov] = useState(false);
   const t = TYPES[task.type] ?? TYPES.personal;
+  const hasQ = (task.total_questions ?? 0) > 0;
 
   return (
     <div
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
-      className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg transition-colors"
+      className="px-2 py-1.5 rounded-lg transition-colors"
       style={{ background: hov ? N.hover : "transparent" }}>
-      {/* Checkbox */}
-      <button onClick={() => onToggle(task.id)}
-        className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-all"
-        style={task.done
-          ? { background: N.muted, borderColor: N.muted }
-          : { background: "transparent", borderColor: N.border }}>
-        {task.done && <Ico.check />}
-      </button>
+      <div className="flex items-center gap-2.5">
+        {/* Checkbox */}
+        <button onClick={() => onToggle(task.id)}
+          className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-all"
+          style={task.done
+            ? { background: N.muted, borderColor: N.muted }
+            : { background: "transparent", borderColor: N.border }}>
+          {task.done && <Ico.check />}
+        </button>
 
-      {/* Name */}
-      <span className="flex-1 text-[13px] min-w-0 truncate"
-        style={{ color: task.done ? N.muted : N.text, textDecoration: task.done ? "line-through" : "none" }}>
-        {task.name}
-      </span>
+        {/* Name */}
+        <span className="flex-1 text-[13px] min-w-0 truncate"
+          style={{ color: task.done ? N.muted : N.text, textDecoration: task.done ? "line-through" : "none" }}>
+          {task.name}
+        </span>
 
-      {/* Properties */}
-      <div className="flex items-center gap-1.5 flex-shrink-0">
-        <PropChip bg={t.bg} color={t.text}>{t.label}</PropChip>
-        {task.deadline !== "No deadline" && (
-          <span className="text-[11px] flex items-center gap-1 hidden sm:flex" style={{ color: N.muted }}>
-            <Ico.clock />{task.deadline}
-          </span>
-        )}
-        {onDelete && hov && (
-          <button onClick={() => onDelete(task.id)} className="transition-colors" style={{ color: N.border }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = N.border)}>
-            <Ico.trash />
-          </button>
-        )}
+        {/* Properties */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <PropChip bg={t.bg} color={t.text}>{t.label}</PropChip>
+          {task.deadline !== "No deadline" && (
+            <span className="text-[11px] flex items-center gap-1 hidden sm:flex" style={{ color: N.muted }}>
+              <Ico.clock />{task.deadline}
+            </span>
+          )}
+          {onDelete && hov && (
+            <button onClick={() => onDelete(task.id)} className="transition-colors" style={{ color: N.border }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = N.border)}>
+              <Ico.trash />
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Question grid */}
+      {hasQ && onUpdateQuestions && !task.done && (
+        <div className="ml-6">
+          <QuestionGrid
+            total={task.total_questions!}
+            completed={task.completed_questions ?? 0}
+            accent={t.accent}
+            onChange={(n) => onUpdateQuestions(task.id, n)}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -953,6 +993,7 @@ function AddTaskModal({ onClose, onAdd, defaultType = "homework", subjects }: {
   const [type, setType] = useState<EventType>(defaultType);
   const [deadline, setDeadline] = useState("");
   const [subject, setSubject] = useState(subjects?.[0]?.name ?? "");
+  const [questions, setQuestions] = useState("");
   const [saving, setSaving] = useState(false);
 
   const modalTitle = defaultType === "exam" ? "New Exam" : defaultType === "homework" ? "New Assignment" : "New Task";
@@ -960,7 +1001,14 @@ function AddTaskModal({ onClose, onAdd, defaultType = "homework", subjects }: {
   const handleAdd = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    await onAdd({ name: name.trim(), type, deadline: deadline || "No deadline", subject: subject || null });
+    const q = parseInt(questions);
+    await onAdd({
+      name: name.trim(), type,
+      deadline: deadline || "No deadline",
+      subject: subject || null,
+      total_questions: q > 0 ? q : null,
+      completed_questions: q > 0 ? 0 : null,
+    });
     setSaving(false);
   };
 
@@ -1015,6 +1063,16 @@ function AddTaskModal({ onClose, onAdd, defaultType = "homework", subjects }: {
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>Due date</p>
               <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-[13px] outline-none"
+                style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
+            </div>
+
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>
+                Questions <span style={{ opacity: 0.5, textTransform: "none", letterSpacing: "normal" }}>(optional)</span>
+              </p>
+              <input type="number" min="1" max="999" placeholder="How many questions?" value={questions}
+                onChange={(e) => setQuestions(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl text-[13px] outline-none"
                 style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
             </div>
@@ -1204,6 +1262,11 @@ export default function Home() {
   const deleteTask = async (id: string) => {
     setTasks((p) => p.filter((t) => t.id !== id));
     await supabase.from("tasks").delete().eq("id", id);
+  };
+
+  const updateTaskQuestions = async (id: string, completed: number) => {
+    setTasks((p) => p.map((t) => t.id === id ? { ...t, completed_questions: completed } : t));
+    await supabase.from("tasks").update({ completed_questions: completed }).eq("id", id);
   };
 
   const addEvent = async (event: Omit<CalendarEvent, "id" | "created_at">) => {
@@ -1406,7 +1469,7 @@ export default function Home() {
                 ? [1,2,3].map((i) => <div key={i} className="h-8 rounded-lg animate-pulse my-0.5" style={{ background: N.hover }} />)
                 : undoneTasks.length === 0
                   ? <p className="text-[13px] py-3 px-2" style={{ color: N.muted }}>No tasks — click New task to add one</p>
-                  : undoneTasks.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} />)
+                  : undoneTasks.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} />)
               }
               {/* Completed toggle */}
               {doneTasks.length > 0 && (
@@ -1421,7 +1484,7 @@ export default function Home() {
                     </span>
                     {doneTasks.length} completed
                   </button>
-                  {showDone && doneTasks.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} />)}
+                  {showDone && doneTasks.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} />)}
                 </>
               )}
             </div>
@@ -1440,7 +1503,7 @@ export default function Home() {
             <div className="mt-1">
               {exams.length === 0
                 ? <p className="text-[13px] py-3 px-2" style={{ color: N.muted }}>No upcoming exams</p>
-                : exams.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} />)
+                : exams.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} />)
               }
             </div>
           </div>
@@ -1458,7 +1521,7 @@ export default function Home() {
             <div className="mt-1">
               {homework.length === 0
                 ? <p className="text-[13px] py-3 px-2" style={{ color: N.muted }}>No assignments 🎉</p>
-                : homework.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} />)
+                : homework.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} />)
               }
             </div>
           </div>
