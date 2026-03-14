@@ -1223,13 +1223,33 @@ export default function Home() {
     setModal(null);
   };
 
+  // ── Date bounds ──
+  const endOfWeekStr = (() => {
+    const d = new Date(today);
+    d.setDate(today.getDate() + (7 - today.getDay())); // this Sunday
+    return toDateStr(d);
+  })();
+  const in7DaysStr = (() => {
+    const d = new Date(today);
+    d.setDate(today.getDate() + 7);
+    return toDateStr(d);
+  })();
+
   // ── Derived ──
-  const weekAgoStr = useMemo(() => { const d = new Date(); d.setDate(d.getDate() - 7); return toDateStr(d); }, []);
-  const isVisible  = (t: Task) => !t.done && (t.deadline === "No deadline" || t.deadline >= weekAgoStr);
-  const undoneTasks = useMemo(() => tasks.filter(isVisible), [tasks, weekAgoStr]);
-  const doneTasks   = useMemo(() => tasks.filter((t) => t.done),  [tasks]);
-  const exams       = useMemo(() => tasks.filter((t) => t.type === "exam"     && isVisible(t)), [tasks, weekAgoStr]);
-  const homework    = useMemo(() => tasks.filter((t) => t.type === "homework" && isVisible(t)), [tasks, weekAgoStr]);
+  // Tasks/homework: not exams, due today → end of this week (or no deadline)
+  const isThisWeek = (t: Task) =>
+    !t.done && t.type !== "exam" &&
+    (t.deadline === "No deadline" || (t.deadline >= todayStr && t.deadline <= endOfWeekStr));
+
+  // Exams: only within the next 7 days
+  const isUpcomingExam = (t: Task) =>
+    !t.done && t.type === "exam" &&
+    t.deadline !== "No deadline" && t.deadline >= todayStr && t.deadline <= in7DaysStr;
+
+  const undoneTasks = useMemo(() => tasks.filter(isThisWeek), [tasks]);
+  const doneTasks   = useMemo(() => tasks.filter((t) => t.done), [tasks]);
+  const exams       = useMemo(() => tasks.filter(isUpcomingExam), [tasks]);
+  const homework    = useMemo(() => tasks.filter((t) => t.type === "homework" && isThisWeek(t)), [tasks]);
 
   const eventCounts = useMemo(() => {
     const m: Record<string, number> = {};
