@@ -16,12 +16,31 @@ interface Task {
   created_at?: string;
 }
 
+interface CalendarEntry {
+  id: string;
+  date: string; // YYYY-MM-DD
+  note: string;
+  created_at?: string;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function toDateStr(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function formatDayLabel(dateStr: string) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 // ─── Badge config ─────────────────────────────────────────────────────────────
 
-const BADGE: Record<
-  TaskType,
-  { label: string; bg: string; text: string; accent: string }
-> = {
+const BADGE: Record<TaskType, { label: string; bg: string; text: string; accent: string }> = {
   homework: { label: "Homework", bg: "#FEF3C7", text: "#92400E", accent: "#F59E0B" },
   exam:     { label: "Exam",     bg: "#FFE4E6", text: "#9F1239", accent: "#F43F5E" },
   personal: { label: "Personal", bg: "#CCFBF1", text: "#0F766E", accent: "#14B8A6" },
@@ -55,6 +74,230 @@ function PlusIcon() {
   );
 }
 
+function ChevronLeft() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ChevronRight() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// ─── Mini Calendar ────────────────────────────────────────────────────────────
+
+const DAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+function MiniCalendar({
+  entryDates,
+  selectedDate,
+  onSelectDate,
+}: {
+  entryDates: Set<string>;
+  selectedDate: string;
+  onSelectDate: (d: string) => void;
+}) {
+  const todayStr = toDateStr(new Date());
+  const [viewDate, setViewDate] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDow = new Date(year, month, 1).getDay();
+
+  const monthLabel = viewDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  const cells: (string | null)[] = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push(`${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
+  }
+
+  return (
+    <div className="bg-white rounded-2xl px-4 pt-4 pb-3 shadow-sm">
+      {/* Month nav */}
+      <div className="flex items-center justify-between mb-3">
+        <button
+          onClick={() => setViewDate(new Date(year, month - 1, 1))}
+          className="w-8 h-8 flex items-center justify-center rounded-full transition-colors active:bg-[#EEF1F8]"
+          style={{ color: "#4A5B9A" }}
+          aria-label="Previous month"
+        >
+          <ChevronLeft />
+        </button>
+        <span className="text-[13px] font-semibold" style={{ fontFamily: "var(--font-outfit)", color: "#0B1437" }}>
+          {monthLabel}
+        </span>
+        <button
+          onClick={() => setViewDate(new Date(year, month + 1, 1))}
+          className="w-8 h-8 flex items-center justify-center rounded-full transition-colors active:bg-[#EEF1F8]"
+          style={{ color: "#4A5B9A" }}
+          aria-label="Next month"
+        >
+          <ChevronRight />
+        </button>
+      </div>
+
+      {/* Day-of-week headers */}
+      <div className="grid grid-cols-7 mb-1">
+        {DAY_LABELS.map((l) => (
+          <div
+            key={l}
+            className="text-center text-[10px] font-semibold py-1"
+            style={{ fontFamily: "var(--font-outfit)", color: "#A0ABBB" }}
+          >
+            {l}
+          </div>
+        ))}
+      </div>
+
+      {/* Day grid */}
+      <div className="grid grid-cols-7">
+        {cells.map((dateStr, i) => {
+          if (!dateStr) return <div key={i} />;
+          const day = parseInt(dateStr.split("-")[2]);
+          const isToday = dateStr === todayStr;
+          const isSelected = dateStr === selectedDate;
+          const hasEntry = entryDates.has(dateStr);
+
+          let bg = "transparent";
+          let color = "#0B1437";
+          if (isSelected) { bg = "#0B1437"; color = "white"; }
+          else if (isToday) { bg = "#F5C518"; color = "#0B1437"; }
+
+          return (
+            <button
+              key={dateStr}
+              onClick={() => onSelectDate(dateStr)}
+              className="flex flex-col items-center justify-center py-0.5"
+            >
+              <div
+                className="w-8 h-8 flex items-center justify-center rounded-full text-[13px] font-medium transition-all active:opacity-70"
+                style={{ backgroundColor: bg, color, fontFamily: "var(--font-outfit)" }}
+              >
+                {day}
+              </div>
+              <div
+                className="w-1 h-1 rounded-full mt-0.5 transition-opacity"
+                style={{
+                  backgroundColor: isSelected ? "#6B7FBF" : "#F5C518",
+                  opacity: hasEntry ? 1 : 0,
+                }}
+              />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Entry Card ───────────────────────────────────────────────────────────────
+
+function EntryCard({ entry, onDelete }: { entry: CalendarEntry; onDelete: (id: string) => void }) {
+  const time = entry.created_at
+    ? new Date(entry.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+    : "";
+  return (
+    <div
+      className="card-enter bg-white rounded-2xl px-4 py-3.5 shadow-sm flex items-start gap-3"
+      style={{ borderLeft: "3px solid #F5C518" }}
+    >
+      <div className="flex-1 min-w-0">
+        <p className="text-[13.5px] font-medium leading-snug" style={{ fontFamily: "var(--font-outfit)", color: "#0B1437" }}>
+          {entry.note}
+        </p>
+        {time && (
+          <p className="text-[10px] mt-1" style={{ fontFamily: "var(--font-outfit)", color: "#A0ABBB" }}>
+            {time}
+          </p>
+        )}
+      </div>
+      <button
+        onClick={() => onDelete(entry.id)}
+        className="w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 active:scale-90 transition-transform mt-0.5"
+        style={{ color: "#CBD5E1" }}
+        aria-label="Delete entry"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+// ─── Add Entry Modal ──────────────────────────────────────────────────────────
+
+function AddEntryModal({
+  date,
+  onClose,
+  onAdd,
+}: {
+  date: string;
+  onClose: () => void;
+  onAdd: (note: string) => Promise<void>;
+}) {
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleAdd = async () => {
+    if (!note.trim()) return;
+    setSaving(true);
+    await onAdd(note.trim());
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end">
+      <div className="overlay-enter absolute inset-0 bg-black/40" onClick={onClose} />
+      <div
+        className="modal-enter relative w-full bg-white rounded-t-3xl px-5 pt-5 pb-10 shadow-2xl"
+        style={{ maxHeight: "90dvh", overflowY: "auto" }}
+      >
+        <div className="w-10 h-1 bg-[#E2E8F0] rounded-full mx-auto mb-5" />
+        <p
+          className="text-[10.5px] font-semibold uppercase tracking-[0.18em] mb-1"
+          style={{ fontFamily: "var(--font-outfit)", color: "#8A93B8" }}
+        >
+          {formatDayLabel(date)}
+        </p>
+        <h3 className="text-xl font-semibold text-[#0B1437] mb-5" style={{ fontFamily: "var(--font-playfair)" }}>
+          Log Entry
+        </h3>
+        <div className="space-y-3.5">
+          <textarea
+            placeholder="Write something — a note, a thought, anything…"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={4}
+            className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3.5 text-sm text-[#0B1437] placeholder-[#CBD5E1] outline-none focus:border-[#6B7FBF] transition-colors resize-none"
+            style={{ fontFamily: "var(--font-outfit)" }}
+            autoFocus
+          />
+          <button
+            onClick={handleAdd}
+            disabled={saving || !note.trim()}
+            className="w-full bg-[#0B1437] text-white py-4 rounded-2xl text-sm font-semibold tracking-wide active:scale-[0.98] transition-all disabled:opacity-50"
+            style={{ fontFamily: "var(--font-outfit)" }}
+          >
+            {saving ? "Saving…" : "Save Entry"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Task Card ────────────────────────────────────────────────────────────────
 
 function TaskCard({ task, index, onToggle }: { task: Task; index: number; onToggle: (id: string) => void }) {
@@ -77,7 +320,6 @@ function TaskCard({ task, index, onToggle }: { task: Task; index: number; onTogg
       >
         {task.done && <CheckIcon />}
       </button>
-
       <div className="flex-1 min-w-0">
         <p
           className="text-[13.5px] font-medium leading-snug mb-2"
@@ -108,7 +350,13 @@ function TaskCard({ task, index, onToggle }: { task: Task; index: number; onTogg
 
 // ─── Add Task Modal ───────────────────────────────────────────────────────────
 
-function AddTaskModal({ onClose, onAdd }: { onClose: () => void; onAdd: (task: Omit<Task, "id" | "done" | "created_at">) => Promise<void> }) {
+function AddTaskModal({
+  onClose,
+  onAdd,
+}: {
+  onClose: () => void;
+  onAdd: (task: Omit<Task, "id" | "done" | "created_at">) => Promise<void>;
+}) {
   const [name, setName] = useState("");
   const [type, setType] = useState<TaskType>("homework");
   const [deadline, setDeadline] = useState("");
@@ -124,7 +372,10 @@ function AddTaskModal({ onClose, onAdd }: { onClose: () => void; onAdd: (task: O
   return (
     <div className="fixed inset-0 z-50 flex items-end">
       <div className="overlay-enter absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="modal-enter relative w-full bg-white rounded-t-3xl px-5 pt-5 pb-10 shadow-2xl" style={{ maxHeight: "90dvh", overflowY: "auto" }}>
+      <div
+        className="modal-enter relative w-full bg-white rounded-t-3xl px-5 pt-5 pb-10 shadow-2xl"
+        style={{ maxHeight: "90dvh", overflowY: "auto" }}
+      >
         <div className="w-10 h-1 bg-[#E2E8F0] rounded-full mx-auto mb-5" />
         <h3 className="text-xl font-semibold text-[#0B1437] mb-5" style={{ fontFamily: "var(--font-playfair)" }}>
           New Task
@@ -183,50 +434,80 @@ function AddTaskModal({ onClose, onAdd }: { onClose: () => void; onAdd: (task: O
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Home() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
+  const today = new Date();
+  const todayStr = toDateStr(today);
 
-  // Load tasks from Supabase
+  // Tasks
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+
+  // Calendar entries
+  const [entries, setEntries] = useState<CalendarEntry[]>([]);
+  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [showEntryModal, setShowEntryModal] = useState(false);
+
+  // Load tasks
   useEffect(() => {
-    async function loadTasks() {
-      const { data } = await supabase
-        .from("tasks")
-        .select("*")
-        .order("created_at", { ascending: true });
-      if (data) setTasks(data as Task[]);
-      setLoading(false);
-    }
-    loadTasks();
+    supabase
+      .from("tasks")
+      .select("*")
+      .order("created_at", { ascending: true })
+      .then(({ data }) => {
+        if (data) setTasks(data as Task[]);
+        setTasksLoading(false);
+      });
+  }, []);
+
+  // Load calendar entries
+  useEffect(() => {
+    supabase
+      .from("calendar_entries")
+      .select("*")
+      .order("created_at", { ascending: true })
+      .then(({ data }) => {
+        if (data) setEntries(data as CalendarEntry[]);
+      });
   }, []);
 
   const toggleTask = async (id: string) => {
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
     const newDone = !task.done;
-    // Optimistic update
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: newDone } : t)));
     await supabase.from("tasks").update({ done: newDone }).eq("id", id);
   };
 
   const addTask = async (task: Omit<Task, "id" | "done" | "created_at">) => {
+    const { data } = await supabase.from("tasks").insert({ ...task, done: false }).select().single();
+    if (data) setTasks((prev) => [...prev, data as Task]);
+    setShowTaskModal(false);
+  };
+
+  const addEntry = async (note: string) => {
     const { data } = await supabase
-      .from("tasks")
-      .insert({ ...task, done: false })
+      .from("calendar_entries")
+      .insert({ date: selectedDate, note })
       .select()
       .single();
-    if (data) setTasks((prev) => [...prev, data as Task]);
-    setShowModal(false);
+    if (data) setEntries((prev) => [...prev, data as CalendarEntry]);
+    setShowEntryModal(false);
+  };
+
+  const deleteEntry = async (id: string) => {
+    setEntries((prev) => prev.filter((e) => e.id !== id));
+    await supabase.from("calendar_entries").delete().eq("id", id);
   };
 
   const done = tasks.filter((t) => t.done).length;
   const total = tasks.length;
   const progress = total > 0 ? (done / total) * 100 : 0;
 
-  const today = new Date();
   const dayName = today.toLocaleDateString("en-US", { weekday: "long" });
   const dateStr = today.toLocaleDateString("en-US", { month: "long", day: "numeric" });
 
+  const entryDates = new Set(entries.map((e) => e.date));
+  const selectedEntries = entries.filter((e) => e.date === selectedDate);
   const sorted = [...tasks.filter((t) => !t.done), ...tasks.filter((t) => t.done)];
 
   return (
@@ -251,37 +532,85 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ── Task list ── */}
-      <div className="px-4 pt-5 pb-32 space-y-2.5">
-        <div className="flex items-center justify-between px-1 mb-3">
-          <span className="text-[10.5px] font-semibold uppercase tracking-[0.18em]" style={{ fontFamily: "var(--font-outfit)", color: "#8A93B8" }}>
-            Today's Tasks
-          </span>
-          <span className="text-[11px]" style={{ fontFamily: "var(--font-outfit)", color: "#8A93B8" }}>
-            {tasks.filter((t) => !t.done).length} remaining
-          </span>
+      <div className="px-4 pt-5 pb-32 space-y-5">
+        {/* ── Calendar ── */}
+        <div>
+          <div className="flex items-center justify-between px-1 mb-3">
+            <span className="text-[10.5px] font-semibold uppercase tracking-[0.18em]" style={{ fontFamily: "var(--font-outfit)", color: "#8A93B8" }}>
+              Calendar
+            </span>
+          </div>
+          <MiniCalendar
+            entryDates={entryDates}
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+          />
         </div>
 
-        {loading ? (
-          // Skeleton cards
-          [1, 2, 3].map((i) => (
-            <div key={i} className="bg-white rounded-2xl px-4 py-4 h-[76px] animate-pulse" style={{ borderLeft: "3px solid #E2E8F0" }} />
-          ))
-        ) : sorted.length === 0 ? (
-          <div className="text-center py-20" style={{ fontFamily: "var(--font-outfit)", color: "#9CA3AF" }}>
-            <p className="text-3xl mb-3">✓</p>
-            <p className="text-sm">All clear — tap + to add a task.</p>
+        {/* ── Day entries ── */}
+        <div>
+          <div className="flex items-center justify-between px-1 mb-3">
+            <span className="text-[10.5px] font-semibold uppercase tracking-[0.18em]" style={{ fontFamily: "var(--font-outfit)", color: "#8A93B8" }}>
+              {formatDayLabel(selectedDate)}
+            </span>
+            <button
+              onClick={() => setShowEntryModal(true)}
+              className="text-[11px] font-semibold active:opacity-60 transition-opacity"
+              style={{ fontFamily: "var(--font-outfit)", color: "#F5C518" }}
+            >
+              + Log entry
+            </button>
           </div>
-        ) : (
-          sorted.map((task, i) => (
-            <TaskCard key={task.id} task={task} index={i} onToggle={toggleTask} />
-          ))
-        )}
+
+          {selectedEntries.length === 0 ? (
+            <div
+              className="text-center py-6 rounded-2xl bg-white/60"
+              style={{ fontFamily: "var(--font-outfit)", color: "#CBD5E1", fontSize: 13 }}
+            >
+              Nothing logged — tap + Log entry
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {selectedEntries.map((entry) => (
+                <EntryCard key={entry.id} entry={entry} onDelete={deleteEntry} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Task list ── */}
+        <div>
+          <div className="flex items-center justify-between px-1 mb-3">
+            <span className="text-[10.5px] font-semibold uppercase tracking-[0.18em]" style={{ fontFamily: "var(--font-outfit)", color: "#8A93B8" }}>
+              Today's Tasks
+            </span>
+            <span className="text-[11px]" style={{ fontFamily: "var(--font-outfit)", color: "#8A93B8" }}>
+              {tasks.filter((t) => !t.done).length} remaining
+            </span>
+          </div>
+
+          {tasksLoading ? (
+            [1, 2, 3].map((i) => (
+              <div key={i} className="bg-white rounded-2xl px-4 py-4 h-[76px] animate-pulse mb-2.5" style={{ borderLeft: "3px solid #E2E8F0" }} />
+            ))
+          ) : sorted.length === 0 ? (
+            <div className="text-center py-12" style={{ fontFamily: "var(--font-outfit)", color: "#9CA3AF" }}>
+              <p className="text-3xl mb-3">✓</p>
+              <p className="text-sm">All clear — tap + to add a task.</p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {sorted.map((task, i) => (
+                <TaskCard key={task.id} task={task} index={i} onToggle={toggleTask} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── FAB ── */}
       <button
-        onClick={() => setShowModal(true)}
+        onClick={() => setShowTaskModal(true)}
         className="fixed right-5 z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center active:scale-90 transition-transform duration-150"
         style={{
           bottom: "calc(80px + 1.25rem)",
@@ -293,8 +622,11 @@ export default function Home() {
         <PlusIcon />
       </button>
 
-      {/* ── Modal ── */}
-      {showModal && <AddTaskModal onClose={() => setShowModal(false)} onAdd={addTask} />}
+      {/* ── Modals ── */}
+      {showTaskModal && <AddTaskModal onClose={() => setShowTaskModal(false)} onAdd={addTask} />}
+      {showEntryModal && (
+        <AddEntryModal date={selectedDate} onClose={() => setShowEntryModal(false)} onAdd={addEntry} />
+      )}
     </div>
   );
 }
