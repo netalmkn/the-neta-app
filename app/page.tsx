@@ -698,6 +698,11 @@ export default function Home() {
     setModal(null);
   };
 
+  const deleteTask = async (id: string) => {
+    setTasks((p) => p.filter((t) => t.id !== id));
+    await supabase.from("tasks").delete().eq("id", id);
+  };
+
   const addEvent = async (event: Omit<CalendarEvent, "id" | "created_at">) => {
     const { data } = await supabase.from("calendar_entries").insert(event).select().single();
     if (data) setEvents((p) => [...p, data as CalendarEvent].sort((a, b) => a.start_time.localeCompare(b.start_time)));
@@ -825,7 +830,7 @@ export default function Home() {
                 ) : undoneTasks.length === 0 ? (
                   <p className="text-[13px] text-center py-6" style={{ color: "#D1D5DB" }}>All done! 🎉</p>
                 ) : (
-                  undoneTasks.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} />)
+                  undoneTasks.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} />)
                 )}
                 {doneTasks.length > 0 && (
                   <>
@@ -834,7 +839,7 @@ export default function Home() {
                       <span className="text-[10px] font-semibold uppercase" style={{ color: "#D1D5DB" }}>Done</span>
                       <div className="flex-1 h-px" style={{ background: "#F3F4F6" }} />
                     </div>
-                    {doneTasks.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} />)}
+                    {doneTasks.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} />)}
                   </>
                 )}
               </div>
@@ -925,7 +930,7 @@ export default function Home() {
               <p className="text-[13px] text-center py-4" style={{ color: "#D1D5DB" }}>No assignments 🎉</p>
             ) : (
               <div className="space-y-0.5">
-                {homework.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} />)}
+                {homework.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} />)}
               </div>
             )}
           </div>
