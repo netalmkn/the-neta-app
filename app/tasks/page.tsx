@@ -128,25 +128,25 @@ function Sidebar({ semesters, activeSemesterId, onSwitch, onDelete, onCreate, on
   );
 }
 
-// ─── Add Task Modal ────────────────────────────────────────────────────────────
+// ─── Task Modal (add + edit) ───────────────────────────────────────────────────
 
-function AddTaskModal({ onClose, onAdd, subjects }: {
+function TaskModal({ onClose, onSave, subjects, initial }: {
   onClose: () => void;
-  onAdd: (t: Omit<Task, "id" | "done" | "created_at">) => Promise<void>;
+  onSave: (t: Omit<Task, "id" | "done" | "created_at">) => Promise<void>;
   subjects: SemesterSubject[];
+  initial?: Task;
 }) {
-  const [name, setName] = useState("");
-  const [type, setType] = useState<EventType>("homework");
-  const [deadline, setDeadline] = useState("");
-  const [subject, setSubject] = useState(subjects[0]?.name ?? "");
-  const [questions, setQuestions] = useState("");
+  const [name, setName] = useState(initial?.name ?? "");
+  const [type, setType] = useState<EventType>(initial?.type ?? "homework");
+  const [deadline, setDeadline] = useState(initial?.deadline && initial.deadline !== "No deadline" ? initial.deadline : "");
+  const [subject, setSubject] = useState(initial?.subject ?? subjects[0]?.name ?? "");
   const [saving, setSaving] = useState(false);
+  const isEdit = !!initial;
 
   const save = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    const q = parseInt(questions);
-    await onAdd({ name: name.trim(), type, deadline: deadline || "No deadline", subject: subject || null, total_questions: q > 0 ? q : null, completed_questions: q > 0 ? 0 : null });
+    await onSave({ name: name.trim(), type, deadline: deadline || "No deadline", subject: subject || null });
     setSaving(false);
   };
 
@@ -157,7 +157,7 @@ function AddTaskModal({ onClose, onAdd, subjects }: {
         style={{ background: N.bg, border: `1px solid ${N.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.14)" }}>
         <div className="w-8 h-1 rounded-full mx-auto mt-3 lg:hidden" style={{ background: N.border }} />
         <div className="px-5 py-5 pb-10 lg:pb-5 space-y-3">
-          <h3 className="text-[17px] font-bold" style={{ color: N.text }}>New Task</h3>
+          <h3 className="text-[17px] font-bold" style={{ color: N.text }}>{isEdit ? "Edit Task" : "New Task"}</h3>
           <input autoFocus type="text" placeholder="Title" value={name}
             onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()}
             className="w-full px-3 py-2.5 rounded-xl text-[14px] outline-none"
@@ -203,20 +203,10 @@ function AddTaskModal({ onClose, onAdd, subjects }: {
               style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
           </div>
 
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>
-              Questions <span style={{ opacity: 0.5, textTransform: "none", letterSpacing: "normal" }}>(optional)</span>
-            </p>
-            <input type="number" min="1" max="999" placeholder="How many questions?" value={questions}
-              onChange={(e) => setQuestions(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl text-[13px] outline-none"
-              style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
-          </div>
-
           <button onClick={save} disabled={saving || !name.trim()}
             className="w-full py-2.5 rounded-xl text-[13px] font-semibold disabled:opacity-40"
             style={{ background: N.text, color: "white" }}>
-            {saving ? "Saving…" : "Add Task"}
+            {saving ? "Saving…" : isEdit ? "Save Changes" : "Add Task"}
           </button>
         </div>
       </div>
@@ -226,14 +216,13 @@ function AddTaskModal({ onClose, onAdd, subjects }: {
 
 // ─── Task Row ─────────────────────────────────────────────────────────────────
 
-function TaskRow({ task, onToggle, onDelete, onUpdateQuestions, subjects }: {
+function TaskRow({ task, onToggle, onDelete, onEdit, subjects }: {
   task: Task; onToggle: (id: string) => void; onDelete: (id: string) => void;
-  onUpdateQuestions?: (id: string, n: number) => void; subjects: SemesterSubject[];
+  onEdit: (task: Task) => void; subjects: SemesterSubject[];
 }) {
   const [hov, setHov] = useState(false);
   const t = TYPES[task.type] ?? TYPES.personal;
   const subColor = subjects.find((s) => s.name === task.subject)?.color;
-  const hasQ = (task.total_questions ?? 0) > 0;
 
   return (
     <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
@@ -264,19 +253,21 @@ function TaskRow({ task, onToggle, onDelete, onUpdateQuestions, subjects }: {
             </span>
           )}
           {hov && (
-            <button onClick={() => onDelete(task.id)} className="transition-colors" style={{ color: N.border }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = N.border)}>
-              <Ico.trash />
-            </button>
+            <>
+              <button onClick={() => onEdit(task)} className="transition-colors" style={{ color: N.muted }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = N.accent)}
+                onMouseLeave={(e) => (e.currentTarget.style.color = N.muted)}>
+                <Ico.edit />
+              </button>
+              <button onClick={() => onDelete(task.id)} className="transition-colors" style={{ color: N.border }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = N.border)}>
+                <Ico.trash />
+              </button>
+            </>
           )}
         </div>
       </div>
-      {hasQ && onUpdateQuestions && !task.done && (
-        <div className="mt-1 ml-6">
-          <QuestionGrid total={task.total_questions!} completed={task.completed_questions ?? 0} accent={t.accent} onChange={(n) => onUpdateQuestions(task.id, n)} />
-        </div>
-      )}
     </div>
   );
 }
@@ -291,6 +282,7 @@ export default function TasksPage() {
   const [activeSemesterId, setActiveSemesterId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const [filterSubject, setFilterSubject] = useState<string | null>(null);
@@ -338,6 +330,14 @@ export default function TasksPage() {
     setModal(false);
   };
 
+  const updateTask = async (task: Omit<Task, "id" | "done" | "created_at">) => {
+    if (!editingTask) return;
+    const { error } = await supabase.from("tasks").update({ name: task.name, type: task.type, deadline: task.deadline, subject: task.subject }).eq("id", editingTask.id);
+    if (error) { alert(`Failed to save: ${error.message}`); return; }
+    setTasks((p) => p.map((t) => t.id === editingTask.id ? { ...t, ...task } : t));
+    setEditingTask(null);
+  };
+
   const toggleTask = async (id: string) => {
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
@@ -349,11 +349,6 @@ export default function TasksPage() {
   const deleteTask = async (id: string) => {
     setTasks((p) => p.filter((t) => t.id !== id));
     await supabase.from("tasks").delete().eq("id", id);
-  };
-
-  const updateTaskQuestions = async (id: string, completed: number) => {
-    setTasks((p) => p.map((t) => t.id === id ? { ...t, completed_questions: completed } : t));
-    await supabase.from("tasks").update({ completed_questions: completed }).eq("id", id);
   };
 
   const filtered = useMemo(() => {
@@ -455,7 +450,7 @@ export default function TasksPage() {
               <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: "#EA580C" }}>Due Today</p>
               <div className="space-y-2">
                 {undone.filter((t) => t.deadline === today).map((t) => (
-                  <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} subjects={subjects} />
+                  <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onEdit={setEditingTask} subjects={subjects} />
                 ))}
               </div>
             </div>
@@ -478,7 +473,7 @@ export default function TasksPage() {
             ) : (
               <div className="space-y-2">
                 {undone.filter((t) => t.deadline !== today).map((t) => (
-                  <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} subjects={subjects} />
+                  <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onEdit={setEditingTask} subjects={subjects} />
                 ))}
               </div>
             )}
@@ -498,7 +493,7 @@ export default function TasksPage() {
               {showDone && (
                 <div className="space-y-2 opacity-70">
                   {done.map((t) => (
-                    <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} subjects={subjects} />
+                    <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onEdit={setEditingTask} subjects={subjects} />
                   ))}
                 </div>
               )}
@@ -507,7 +502,8 @@ export default function TasksPage() {
         </div>
       </main>
 
-      {modal && <AddTaskModal onClose={() => setModal(false)} onAdd={addTask} subjects={subjects} />}
+      {modal && <TaskModal onClose={() => setModal(false)} onSave={addTask} subjects={subjects} />}
+      {editingTask && <TaskModal onClose={() => setEditingTask(null)} onSave={updateTask} subjects={subjects} initial={editingTask} />}
     </div>
   );
 }
