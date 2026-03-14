@@ -194,13 +194,15 @@ const Ico = {
 
 // ─── Semester Picker ──────────────────────────────────────────────────────────
 
-function SemesterPicker({ semesters, activeSemesterId, onSwitch, onCreate }: {
+function SemesterPicker({ semesters, activeSemesterId, onSwitch, onCreate, onDelete }: {
   semesters: Semester[];
   activeSemesterId: string | null;
   onSwitch: (id: string) => void;
   onCreate: () => void;
+  onDelete: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const active = semesters.find((s) => s.id === activeSemesterId);
 
   return (
@@ -224,13 +226,27 @@ function SemesterPicker({ semesters, activeSemesterId, onSwitch, onCreate }: {
             <p className="px-3 py-1.5 text-[12px]" style={{ color: N.muted }}>No semesters yet</p>
           )}
           {semesters.map((s) => (
-            <button key={s.id} onClick={() => { onSwitch(s.id); setOpen(false); }}
-              className="w-full text-left px-3 py-1.5 text-[13px] transition-colors"
-              style={{ background: s.id === activeSemesterId ? N.selected : "transparent", color: N.text }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = s.id === activeSemesterId ? N.selected : N.hover; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = s.id === activeSemesterId ? N.selected : "transparent"; }}>
-              {s.name}
-            </button>
+            <div key={s.id} className="flex items-center group"
+              onMouseEnter={() => setHoveredId(s.id)}
+              onMouseLeave={() => setHoveredId(null)}
+              style={{ background: s.id === activeSemesterId ? N.selected : hoveredId === s.id ? N.hover : "transparent" }}>
+              <button onClick={() => { onSwitch(s.id); setOpen(false); }}
+                className="flex-1 text-left px-3 py-1.5 text-[13px]"
+                style={{ color: N.text }}>
+                {s.name}
+              </button>
+              {hoveredId === s.id && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(s.id); setOpen(false); }}
+                  className="px-2 py-1.5 transition-colors"
+                  style={{ color: N.muted }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = N.muted)}
+                  title="Delete semester">
+                  <Ico.trash />
+                </button>
+              )}
+            </div>
           ))}
           <Divider />
           <button onClick={() => { onCreate(); setOpen(false); }}
@@ -255,11 +271,12 @@ const NAV_ITEMS = [
   { href: "/exams",    label: "Exams",     emoji: "📝" },
 ] as const;
 
-function SidebarContent({ semesters, activeSemesterId, onSwitchSemester, onCreateSemester, onClose }: {
+function SidebarContent({ semesters, activeSemesterId, onSwitchSemester, onCreateSemester, onDeleteSemester, onClose }: {
   semesters: Semester[];
   activeSemesterId: string | null;
   onSwitchSemester: (id: string) => void;
   onCreateSemester: () => void;
+  onDeleteSemester: (id: string) => void;
   onClose?: () => void;
 }) {
   const pathname = usePathname();
@@ -289,6 +306,7 @@ function SidebarContent({ semesters, activeSemesterId, onSwitchSemester, onCreat
           activeSemesterId={activeSemesterId}
           onSwitch={onSwitchSemester}
           onCreate={onCreateSemester}
+          onDelete={onDeleteSemester}
         />
       </div>
 
@@ -968,6 +986,19 @@ export default function Home() {
     setModal(null);
   };
 
+  const deleteSemester = async (id: string) => {
+    await supabase.from("semesters").delete().eq("id", id);
+    setSemesters((p) => {
+      const remaining = p.filter((s) => s.id !== id);
+      if (activeSemesterId === id) {
+        const next = remaining[remaining.length - 1] ?? null;
+        setActiveSemesterId(next?.id ?? null);
+        setTasks([]); setStudyLogs([]);
+      }
+      return remaining;
+    });
+  };
+
   const toggleTask = async (id: string) => {
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
@@ -1061,6 +1092,7 @@ export default function Home() {
         <SidebarContent
           semesters={semesters} activeSemesterId={activeSemesterId}
           onSwitchSemester={switchSemester} onCreateSemester={() => setModal("semester")}
+          onDeleteSemester={deleteSemester}
         />
       </aside>
 
@@ -1074,6 +1106,7 @@ export default function Home() {
               semesters={semesters} activeSemesterId={activeSemesterId}
               onSwitchSemester={switchSemester}
               onCreateSemester={() => { setModal("semester"); setDrawerOpen(false); }}
+              onDeleteSemester={deleteSemester}
               onClose={() => setDrawerOpen(false)}
             />
           </aside>
