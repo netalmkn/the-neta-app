@@ -84,10 +84,11 @@ const SHADOW = "0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)";
 
 // Dummy study data
 const STUDY_SUBJECTS = [
-  { name: "Mathematics",       hours: 3.5, target: 5,  color: "#3B82F6" },
-  { name: "Computer Science",  hours: 2.0, target: 4,  color: "#8B5CF6" },
-  { name: "History",           hours: 1.5, target: 3,  color: "#F97316" },
-  { name: "Biology",           hours: 0.5, target: 4,  color: "#22C55E" },
+  { name: "C Programming",          hours: 2.0, target: 5,  color: "#93C5FD" },
+  { name: "Logic & Set Theory",     hours: 1.5, target: 4,  color: "#C4B5FD" },
+  { name: "Data Structures",        hours: 3.0, target: 5,  color: "#86EFAC" },
+  { name: "Calculus 2",             hours: 1.0, target: 4,  color: "#FCA5A5" },
+  { name: "Linear Algebra 2",       hours: 2.5, target: 4,  color: "#FDE68A" },
 ];
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
