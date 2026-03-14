@@ -186,7 +186,7 @@ function AddTaskModal({ onClose, onAdd, subjects }: {
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>Type</p>
             <div className="flex flex-wrap gap-1.5">
-              {(Object.keys(TYPES) as EventType[]).map((k) => (
+              {(Object.keys(TYPES) as EventType[]).filter((k) => k !== "exam").map((k) => (
                 <button key={k} onClick={() => setType(k)}
                   className="px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors"
                   style={{ background: type === k ? TYPES[k].bg : N.hover, color: type === k ? TYPES[k].text : N.muted, border: type === k ? `1.5px solid ${TYPES[k].accent}` : "1.5px solid transparent" }}>
@@ -355,10 +355,10 @@ export default function TasksPage() {
     await supabase.from("tasks").update({ completed_questions: completed }).eq("id", id);
   };
 
-  const filtered = useMemo(() =>
-    filterSubject ? tasks.filter((t) => t.subject === filterSubject) : tasks,
-    [tasks, filterSubject]
-  );
+  const filtered = useMemo(() => {
+    const nonExams = tasks.filter((t) => t.type !== "exam");
+    return filterSubject ? nonExams.filter((t) => t.subject === filterSubject) : nonExams;
+  }, [tasks, filterSubject]);
   const undone = useMemo(() => filtered.filter((t) => !t.done), [filtered]);
   const done  = useMemo(() => filtered.filter((t) =>  t.done), [filtered]);
 
