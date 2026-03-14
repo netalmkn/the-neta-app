@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type EventType = "homework" | "exam" | "personal" | "project" | "school";
+type EventType = "homework" | "exam" | "personal" | "project" | "school" | "class" | "errands" | "workout";
 type Recurrence = "none" | "daily" | "weekly" | "monthly";
 
 interface CalendarEvent {
@@ -45,25 +45,30 @@ const DAYS_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 const N = {
-  bg:       "#FAFAF9",
-  sidebar:  "#F5F2EC",
-  text:     "#1C1C1E",
-  muted:    "#9B9894",
-  border:   "#E8E4DA",
-  hover:    "#F0EDE5",
-  active:   "#E8E2D8",
-  selected: "#EEF2FF",
-  accent:   "#6366F1",
-  accentBg: "#EEF2FF",
+  bg:       "#F3F8FE",
+  sidebar:  "#E6F0FB",
+  text:     "#1A2D45",
+  muted:    "#6E90B0",
+  border:   "#C8D9EE",
+  hover:    "#DDE9F8",
+  active:   "#C5D9F0",
+  selected: "#B8D0F2",
+  accent:   "#3B7ED8",
+  accentBg: "#EBF3FF",
 };
 
 const TYPES: Record<EventType, { label: string; bg: string; text: string; accent: string }> = {
   homework: { label: "Homework", bg: "#EFF6FF", text: "#1D4ED8", accent: "#3B82F6" },
-  exam:     { label: "Exam",     bg: "#FFF7ED", text: "#C2410C", accent: "#F97316" },
-  personal: { label: "Personal", bg: "#F0FDF4", text: "#166534", accent: "#22C55E" },
+  exam:     { label: "Exam",     bg: "#FFF0F0", text: "#B91C1C", accent: "#F87171" },
+  personal: { label: "Personal", bg: "#F0FDF4", text: "#15803D", accent: "#22C55E" },
   project:  { label: "Project",  bg: "#F5F3FF", text: "#6D28D9", accent: "#8B5CF6" },
-  school:   { label: "School",   bg: "#FFF0FA", text: "#BE185D", accent: "#EC4899" },
+  school:   { label: "School",   bg: "#F0F9FF", text: "#0369A1", accent: "#0EA5E9" },
+  class:    { label: "Class",    bg: "#EFF6FF", text: "#1E40AF", accent: "#60A5FA" },
+  errands:  { label: "Errands",  bg: "#FFF7ED", text: "#C2410C", accent: "#F97316" },
+  workout:  { label: "Workout",  bg: "#F0FDF4", text: "#166534", accent: "#4ADE80" },
 };
+
+const CAL_TYPES: EventType[] = ["personal", "school", "exam", "class", "errands", "workout"];
 
 const RECURRENCE_OPTIONS: { value: Recurrence; label: string }[] = [
   { value: "none",    label: "Does not repeat" },
@@ -125,7 +130,7 @@ function EventForm({
 
       {/* Type */}
       <div className="flex flex-wrap gap-1.5">
-        {(Object.keys(TYPES) as EventType[]).map((k) => (
+        {CAL_TYPES.map((k) => (
           <button key={k} onClick={() => setType(k)}
             className="px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors"
             style={{

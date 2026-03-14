@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type EventType = "homework" | "exam" | "personal" | "project" | "school";
+type EventType = "homework" | "exam" | "personal" | "project" | "school" | "class" | "errands" | "workout";
 
 interface Task {
   id: string;
@@ -106,27 +106,32 @@ const MON3 = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov",
 // ─── Notion design tokens ─────────────────────────────────────────────────────
 
 const N = {
-  bg:        "#FAFAF9",
-  sidebar:   "#F5F2EC",
-  text:      "#1C1C1E",
-  muted:     "#9B9894",
-  border:    "#E8E4DA",
-  hover:     "#F0EDE5",
-  active:    "#E8E2D8",
-  selected:  "#EEF2FF",
-  accent:    "#6366F1",
-  accentBg:  "#EEF2FF",
+  bg:       "#F3F8FE",
+  sidebar:  "#E6F0FB",
+  text:     "#1A2D45",
+  muted:    "#6E90B0",
+  border:   "#C8D9EE",
+  hover:    "#DDE9F8",
+  active:   "#C5D9F0",
+  selected: "#B8D0F2",
+  accent:   "#3B7ED8",
+  accentBg: "#EBF3FF",
 };
 
 // ─── Type config ──────────────────────────────────────────────────────────────
 
 const TYPES: Record<EventType, { label: string; bg: string; text: string; accent: string }> = {
   homework: { label: "Homework", bg: "#EFF6FF", text: "#1D4ED8", accent: "#3B82F6" },
-  exam:     { label: "Exam",     bg: "#FFF7ED", text: "#C2410C", accent: "#F97316" },
-  personal: { label: "Personal", bg: "#F0FDF4", text: "#166534", accent: "#22C55E" },
+  exam:     { label: "Exam",     bg: "#FFF0F0", text: "#B91C1C", accent: "#F87171" },
+  personal: { label: "Personal", bg: "#F0FDF4", text: "#15803D", accent: "#22C55E" },
   project:  { label: "Project",  bg: "#F5F3FF", text: "#6D28D9", accent: "#8B5CF6" },
-  school:   { label: "School",   bg: "#FFF0FA", text: "#BE185D", accent: "#EC4899" },
+  school:   { label: "School",   bg: "#F0F9FF", text: "#0369A1", accent: "#0EA5E9" },
+  class:    { label: "Class",    bg: "#EFF6FF", text: "#1E40AF", accent: "#60A5FA" },
+  errands:  { label: "Errands",  bg: "#FFF7ED", text: "#C2410C", accent: "#F97316" },
+  workout:  { label: "Workout",  bg: "#F0FDF4", text: "#166534", accent: "#4ADE80" },
 };
+
+const CAL_TYPES: EventType[] = ["personal", "school", "exam", "class", "errands", "workout"];
 
 const SUBJECT_COLORS = [
   "#93C5FD","#BAE6FD","#A5F3FC","#6EE7B7","#86EFAC",
@@ -342,11 +347,11 @@ const NAV_ITEMS = [
 ] as const;
 
 const NAV_ICONS_MAP: Record<string, React.ReactNode> = {
-  "/":         <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 12L5 10M5 10L12 3L19 10M5 10V20C5 20.55 5.45 21 6 21H9M19 10L21 12M19 10V20C19 20.55 18.55 21 18 21H15M9 21V15C9 15 9 15 12 15C15 15 15 15 15 21M9 21H15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  "/tasks":    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 5H7C5.9 5 5 5.9 5 7V19C5 20.1 5.9 21 7 21H17C18.1 21 19 20.1 19 19V7C19 5.9 18.1 5 17 5H15M9 5C9 5.55 9.45 6 10 6H14C14.55 6 15 5.55 15 5M9 5C9 4.45 9.45 4 10 4H14C14.55 4 15 4.45 15 5M9 12L11 14L15 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  "/homework": <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 6.25V19.25M12 6.25C10.83 5.48 9.25 5 7.5 5C5.75 5 4.17 5.48 3 6.25V19.25C4.17 18.48 5.75 18 7.5 18C9.25 18 10.83 18.48 12 19.25M12 6.25C13.17 5.48 14.75 5 16.5 5C18.25 5 19.83 5.48 21 6.25V19.25C19.83 18.48 18.25 18 16.5 18C14.75 18 13.17 18.48 12 19.25" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  "/exams":    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 5H7C5.9 5 5 5.9 5 7V19C5 20.1 5.9 21 7 21H17C18.1 21 19 20.1 19 19V7C19 5.9 18.1 5 17 5H15M9 5C9 5.55 9.45 6 10 6H14C14.55 6 15 5.55 15 5M9 5C9 4.45 9.45 4 10 4H14C14.55 4 15 4.45 15 5M9 12H15M9 16H12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-  "/calendar": <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.6"/><path d="M8 2V6M16 2V6M3 10H21" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/><path d="M8 14H8.01M12 14H12.01M16 14H16.01M8 18H8.01M12 18H12.01" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/></svg>,
+  "/":         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 12L5 10M5 10L12 3L19 10M5 10V20C5 20.55 5.45 21 6 21H9M19 10L21 12M19 10V20C19 20.55 18.55 21 18 21H15M9 21V15C9 15 9 15 12 15C15 15 15 15 15 21M9 21H15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  "/tasks":    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 5H7C5.9 5 5 5.9 5 7V19C5 20.1 5.9 21 7 21H17C18.1 21 19 20.1 19 19V7C19 5.9 18.1 5 17 5H15M9 5C9 5.55 9.45 6 10 6H14C14.55 6 15 5.55 15 5M9 5C9 4.45 9.45 4 10 4H14C14.55 4 15 4.45 15 5M9 12L11 14L15 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  "/homework": <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 6.25V19.25M12 6.25C10.83 5.48 9.25 5 7.5 5C5.75 5 4.17 5.48 3 6.25V19.25C4.17 18.48 5.75 18 7.5 18C9.25 18 10.83 18.48 12 19.25M12 6.25C13.17 5.48 14.75 5 16.5 5C18.25 5 19.83 5.48 21 6.25V19.25C19.83 18.48 18.25 18 16.5 18C14.75 18 13.17 18.48 12 19.25" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  "/exams":    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 5H7C5.9 5 5 5.9 5 7V19C5 20.1 5.9 21 7 21H17C18.1 21 19 20.1 19 19V7C19 5.9 18.1 5 17 5H15M9 5C9 5.55 9.45 6 10 6H14C14.55 6 15 5.55 15 5M9 5C9 4.45 9.45 4 10 4H14C14.55 4 15 4.45 15 5M9 12H15M9 16H12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  "/calendar": <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.8"/><path d="M8 2V6M16 2V6M3 10H21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M8 14H8.01M12 14H12.01M16 14H16.01M8 18H8.01M12 18H12.01" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"/></svg>,
 };
 
 function SidebarContent({ semesters, activeSemesterId, onSwitchSemester, onCreateSemester, onDeleteSemester, onEditSemester, onClose }: {
@@ -411,11 +416,11 @@ function SidebarContent({ semesters, activeSemesterId, onSwitchSemester, onCreat
           const active = pathname === href;
           return (
             <Link key={href} href={href} onClick={onClose}
-              className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] transition-colors"
-              style={{ background: active ? N.selected : "transparent", color: active ? N.accent : N.muted, fontWeight: active ? 600 : 400 }}
+              className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-[13px] transition-all"
+              style={{ background: active ? N.accent : "transparent", color: active ? "white" : N.muted, fontWeight: active ? 600 : 400, boxShadow: active ? `0 2px 8px ${N.accent}40` : "none" }}
               onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = N.hover; }}
-              onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = active ? N.selected : "transparent"; }}>
-              <span style={{ color: active ? N.accent : N.muted }}>{NAV_ICONS_MAP[href]}</span>
+              onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}>
+              <span style={{ color: active ? "white" : N.muted }}>{NAV_ICONS_MAP[href]}</span>
               {label}
             </Link>
           );
@@ -844,23 +849,28 @@ function LogStudyModal({ subjects, onClose, onLog }: {
 
 // ─── Task Row (Notion database style) ────────────────────────────────────────
 
-function TaskRow({ task, onToggle, onDelete, onUpdateQuestions }: {
+function TaskRow({ task, onToggle, onDelete, onUpdateQuestions, subjects }: {
   task: Task;
   onToggle: (id: string) => void;
   onDelete?: (id: string) => void;
   onUpdateQuestions?: (id: string, n: number) => void;
+  subjects?: SemesterSubject[];
 }) {
   const [hov, setHov] = useState(false);
   const t = TYPES[task.type] ?? TYPES.personal;
   const hasQ = (task.total_questions ?? 0) > 0;
+  const subColor = subjects?.find((s) => s.name === task.subject)?.color ?? t.accent;
 
   return (
     <div
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
-      className="px-2 py-1.5 rounded-lg transition-colors"
+      className="px-3 py-2.5 rounded-xl transition-colors"
       style={{ background: hov ? N.hover : "transparent" }}>
       <div className="flex items-center gap-2.5">
+        {/* Subject color dot */}
+        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: subColor }} />
+
         {/* Checkbox */}
         <button onClick={() => onToggle(task.id)}
           className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-all"
@@ -870,17 +880,22 @@ function TaskRow({ task, onToggle, onDelete, onUpdateQuestions }: {
           {task.done && <Ico.check />}
         </button>
 
-        {/* Name */}
-        <span className="flex-1 text-[13px] min-w-0 truncate"
-          style={{ color: task.done ? N.muted : N.text, textDecoration: task.done ? "line-through" : "none" }}>
-          {task.name}
-        </span>
+        {/* Name + subject */}
+        <div className="flex-1 min-w-0">
+          <span className="text-[13px] block truncate"
+            style={{ color: task.done ? N.muted : N.text, textDecoration: task.done ? "line-through" : "none" }}>
+            {task.name}
+          </span>
+          {task.subject && (
+            <span className="text-[11px]" style={{ color: N.muted }}>{task.subject}</span>
+          )}
+        </div>
 
         {/* Properties */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <PropChip bg={t.bg} color={t.text}>{t.label}</PropChip>
           {task.deadline !== "No deadline" && (
-            <span className="text-[11px] flex items-center gap-1 hidden sm:flex" style={{ color: N.muted }}>
+            <span className="text-[11px] hidden sm:flex items-center gap-0.5" style={{ color: N.muted }}>
               <Ico.clock />{task.deadline}
             </span>
           )}
@@ -896,11 +911,11 @@ function TaskRow({ task, onToggle, onDelete, onUpdateQuestions }: {
 
       {/* Question grid */}
       {hasQ && onUpdateQuestions && !task.done && (
-        <div className="ml-6">
+        <div className="ml-10">
           <QuestionGrid
             total={task.total_questions!}
             completed={task.completed_questions ?? 0}
-            accent={t.accent}
+            accent={subColor}
             onChange={(n) => onUpdateQuestions(task.id, n)}
           />
         </div>
@@ -1011,27 +1026,37 @@ function WeeklyBarChart({ studyLogs }: { studyLogs: StudyLog[] }) {
 
 // ─── FAB ──────────────────────────────────────────────────────────────────────
 
-function FAB({ onAddTask, onAddExam, onAddEvent }: { onAddTask: () => void; onAddExam: () => void; onAddEvent: () => void }) {
+function FAB({ onAddTask, onAddExam, onAddEvent, onLogStudy }: {
+  onAddTask: () => void; onAddExam: () => void; onAddEvent: () => void; onLogStudy: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const options = [
-    { label: "New task",  action: onAddTask },
-    { label: "New exam",  action: onAddExam },
-    { label: "New event", action: onAddEvent },
+    { label: "Log study session", action: onLogStudy },
+    { label: "New event",         action: onAddEvent },
+    { label: "New exam",          action: onAddExam  },
+    { label: "New task",          action: onAddTask  },
   ];
   return (
-    <div className="fixed right-5 z-40 flex flex-col-reverse items-end gap-1.5" style={{ bottom: "calc(80px + 1rem)" }}>
+    <div className="fixed right-5 z-40 flex flex-col-reverse items-end gap-2"
+      style={{ bottom: "calc(80px + 1rem)" }}>
       {open && options.map((opt, i) => (
-        <div key={opt.label} className="fab-option flex items-center gap-2" style={{ animationDelay: `${i * 35}ms` }}>
-          <span className="text-[12px] font-medium px-3 py-1.5 rounded-lg"
-            style={{ background: N.bg, color: N.text, border: `1px solid ${N.border}`, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
-            {opt.label}
-          </span>
-        </div>
+        <button key={opt.label}
+          onClick={() => { opt.action(); setOpen(false); }}
+          className="fab-option text-[12px] font-semibold px-4 py-2 rounded-xl transition-all active:scale-95"
+          style={{
+            background: "white",
+            color: N.text,
+            border: `1px solid ${N.border}`,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.10)",
+            animationDelay: `${i * 35}ms`,
+          }}>
+          {opt.label}
+        </button>
       ))}
       <button onClick={() => setOpen(!open)}
-        className="w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 active:scale-90"
-        style={{ background: N.text, boxShadow: "0 4px 16px rgba(0,0,0,0.18)", transform: open ? "rotate(45deg)" : "none" }}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="white" strokeWidth="2.5" strokeLinecap="round"/></svg>
+        className="w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-200 active:scale-90"
+        style={{ background: N.accent, boxShadow: `0 4px 16px ${N.accent}50`, transform: open ? "rotate(45deg)" : "none" }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="white" strokeWidth="2.5" strokeLinecap="round"/></svg>
       </button>
     </div>
   );
@@ -1167,7 +1192,6 @@ function AddEventModal({ date, onClose, onAdd }: {
         <div className="w-8 h-1 rounded-full mx-auto mt-3 lg:hidden" style={{ background: N.border }} />
         <div className="px-5 py-5 pb-10 lg:pb-5">
           <p className="text-[11px] font-semibold uppercase tracking-widest mb-1" style={{ color: N.muted }}>{label}</p>
-          
           <h3 className="text-[17px] font-bold mb-4" style={{ color: N.text }}>New Event</h3>
           <div className="space-y-3">
             <input autoFocus type="text" placeholder="Event title" value={title}
@@ -1175,7 +1199,7 @@ function AddEventModal({ date, onClose, onAdd }: {
               className="w-full px-3 py-2 rounded-lg text-[14px] outline-none"
               style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
             <div className="flex flex-wrap gap-1.5">
-              {(Object.keys(TYPES) as EventType[]).map((k) => (
+              {CAL_TYPES.map((k) => (
                 <button key={k} onClick={() => setType(k)}
                   className="px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors"
                   style={{ background: type === k ? TYPES[k].bg : N.hover, color: type === k ? TYPES[k].text : N.muted, border: type === k ? `1.5px solid ${TYPES[k].accent}` : `1.5px solid transparent` }}>
@@ -1352,7 +1376,7 @@ export default function Home() {
   // ── Date bounds ──
   const endOfWeekStr = (() => {
     const d = new Date(today);
-    d.setDate(today.getDate() + (7 - today.getDay())); // this Sunday
+    d.setDate(today.getDate() + (7 - today.getDay()));
     return toDateStr(d);
   })();
   const in7DaysStr = (() => {
@@ -1361,13 +1385,10 @@ export default function Home() {
     return toDateStr(d);
   })();
 
-  // ── Derived ──
-  // Tasks/homework: not exams, due today → end of this week (or no deadline)
   const isThisWeek = (t: Task) =>
     !t.done && t.type !== "exam" &&
     (t.deadline === "No deadline" || (t.deadline >= todayStr && t.deadline <= endOfWeekStr));
 
-  // Exams: only within the next 7 days
   const isUpcomingExam = (t: Task) =>
     !t.done && t.type === "exam" &&
     t.deadline !== "No deadline" && t.deadline >= todayStr && t.deadline <= in7DaysStr;
@@ -1376,6 +1397,7 @@ export default function Home() {
   const doneTasks   = useMemo(() => tasks.filter((t) => t.done), [tasks]);
   const exams       = useMemo(() => tasks.filter(isUpcomingExam), [tasks]);
   const homework    = useMemo(() => tasks.filter((t) => t.type === "homework" && isThisWeek(t)), [tasks]);
+  const tasksOnly   = useMemo(() => tasks.filter((t) => isThisWeek(t) && t.type !== "homework"), [tasks]);
 
   const eventCounts = useMemo(() => {
     const m: Record<string, number> = {};
@@ -1455,7 +1477,7 @@ export default function Home() {
 
         {/* Mobile top bar */}
         <div className="lg:hidden flex items-center gap-2 px-4 pt-12 pb-3"
-          style={{ borderBottom: `1px solid ${N.border}` }}>
+          style={{ borderBottom: `1px solid ${N.border}`, background: N.bg }}>
           <button onClick={() => setDrawerOpen(true)} className="p-1 rounded transition-colors"
             style={{ color: N.muted }}
             onMouseEnter={(e) => (e.currentTarget.style.background = N.hover)}
@@ -1464,244 +1486,322 @@ export default function Home() {
           </button>
           <span className="text-[14px] font-semibold" style={{ color: N.text }}>Dashboard</span>
           {activeSemesterName && (
-            <span className="ml-auto text-[11px] px-2 py-0.5 rounded" style={{ background: N.hover, color: N.muted }}>
+            <span className="ml-auto text-[11px] px-2 py-0.5 rounded-lg" style={{ background: N.hover, color: N.muted }}>
               {activeSemesterName}
             </span>
           )}
         </div>
 
-        {/* Page body — centered like Notion */}
-        <div className="max-w-3xl mx-auto px-6 lg:px-12 py-10 pb-28 lg:pb-16">
+        {/* Page body */}
+        <div className="px-4 lg:px-8 py-6 pb-32 lg:pb-12 max-w-screen-xl mx-auto">
 
-          {/* ── Page header ── */}
-          <div className="mb-8">
-            <h1 className="text-[28px] lg:text-[32px] font-bold tracking-tight mb-1" style={{ color: N.text }}>
-              {greet()}, Neta
+          {/* ── Header ── */}
+          <div className="mb-6">
+            <h1 className="text-[26px] lg:text-[30px] font-bold tracking-tight mb-1" style={{ color: N.text }}>
+              {greet()}, Neta 👋
             </h1>
-            <p className="text-[14px]" style={{ color: N.muted }}>
+            <p className="text-[13px]" style={{ color: N.muted }}>
               {today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
-              {activeSemesterName && <> · <span>{activeSemesterName}</span></>}
+              {activeSemesterName && <> · <span style={{ color: N.accent }}>{activeSemesterName}</span></>}
             </p>
           </div>
 
           {/* ── Stat cards ── */}
-          <div className="mb-7 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
             {[
-              { label: "Tasks left",     value: undoneTasks.length, bg: "#EEF2FF", num: "#6366F1" },
-              { label: "Done this week", value: tasksDoneThisWeek,  bg: "#F0FDF4", num: "#16A34A" },
-              { label: "Upcoming exams", value: exams.length,       bg: "#FFF7ED", num: "#EA580C" },
-              { label: "Day streak",     value: streak ? `${streak} 🔥` : "0", bg: "#FDF4FF", num: "#9333EA" },
+              { label: "Tasks left",      value: undoneTasks.length,              bg: "#DBEAFE", num: "#1D4ED8" },
+              { label: "Hours this week", value: `${totalHrsThisWeek.toFixed(1)}h`, bg: "#DCFCE7", num: "#15803D" },
+              { label: "Upcoming exams",  value: exams.length,                    bg: "#FFEDD5", num: "#C2410C" },
+              { label: "Day streak",      value: streak ? `${streak} 🔥` : "0",  bg: "#EDE9FE", num: "#7C3AED" },
             ].map((s) => (
-              <div key={s.label} className="rounded-2xl px-4 py-3.5"
-                style={{ background: s.bg, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-                <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>{s.label}</p>
-                <p className="text-[26px] font-bold leading-none" style={{ color: s.num }}>{s.value}</p>
+              <div key={s.label} className="rounded-2xl px-4 py-4"
+                style={{ background: s.bg, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+                <p className="text-[11px] font-semibold uppercase tracking-widest mb-2"
+                  style={{ color: s.num, opacity: 0.7 }}>{s.label}</p>
+                <p className="text-[30px] font-bold leading-none" style={{ color: s.num }}>{s.value}</p>
               </div>
             ))}
           </div>
 
+          {/* ── Recommended Study ── */}
+          {subjects.length > 0 && (
+            <div className="mb-6 rounded-2xl p-5 flex items-center justify-between gap-4"
+              style={{ background: `linear-gradient(135deg, #EBF3FF 0%, #F0F8FF 100%)`, border: `1px solid ${N.border}` }}>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-widest mb-1" style={{ color: N.accent }}>
+                  Recommended
+                </p>
+                <p className="text-[17px] font-bold mb-0.5" style={{ color: N.text }}>Ready to study?</p>
+                <p className="text-[13px] truncate" style={{ color: N.muted }}>
+                  {activeSemesterName ?? "Start a semester"} · Log a session to track your progress
+                </p>
+              </div>
+              <button onClick={() => setModal("study")}
+                className="flex-shrink-0 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all active:scale-95"
+                style={{ background: N.accent, color: "white", boxShadow: `0 4px 12px ${N.accent}40` }}>
+                + Log Session
+              </button>
+            </div>
+          )}
+
           {/* ── No semester callout ── */}
           {semesters.length === 0 && (
-            <div className="flex items-start gap-3 px-4 py-3 rounded-lg mb-6"
-              style={{ background: "#FFF9E6", border: "1px solid #FFE58F" }}>
+            <div className="flex items-start gap-3 px-4 py-3 rounded-xl mb-6"
+              style={{ background: "#FFFBEB", border: "1px solid #FDE68A" }}>
               <span style={{ fontSize: 16 }}>💡</span>
               <div className="flex-1">
-                <p className="text-[13px] font-semibold" style={{ color: "#7C5E10" }}>No semester created yet</p>
-                <p className="text-[12px] mt-0.5" style={{ color: "#A07D2B" }}>Create a semester to start tracking courses and study progress.</p>
+                <p className="text-[13px] font-semibold" style={{ color: "#92400E" }}>No semester created yet</p>
+                <p className="text-[12px] mt-0.5" style={{ color: "#B45309" }}>Create a semester to track courses and study progress.</p>
               </div>
               <button onClick={() => setModal("semester")}
-                className="text-[12px] font-semibold px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
-                style={{ background: "#FFC107", color: "#5C3D00" }}>
+                className="text-[12px] font-semibold px-3 py-1.5 rounded-lg flex-shrink-0"
+                style={{ background: "#F59E0B", color: "white" }}>
                 Create
               </button>
             </div>
           )}
 
-          {/* ── Tasks ── */}
-          <div className="mb-6">
-            <SectionTitle label="Tasks" count={undoneTasks.length > 0 ? undoneTasks.length : undefined}
-              action={
-                <GhostBtn onClick={() => setModal("task")}>
-                  <Ico.plus /> New task
-                </GhostBtn>
-              }
-            />
-            <Divider />
-            <div className="mt-1">
-              {tasksLoading
-                ? [1,2,3].map((i) => <div key={i} className="h-8 rounded-lg animate-pulse my-0.5" style={{ background: N.hover }} />)
-                : undoneTasks.length === 0
-                  ? <p className="text-[13px] py-3 px-2" style={{ color: N.muted }}>No tasks — click New task to add one</p>
-                  : undoneTasks.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} />)
-              }
-              {/* Completed toggle */}
-              {doneTasks.length > 0 && (
-                <>
-                  <button onClick={() => setShowDone(!showDone)}
-                    className="flex items-center gap-1.5 px-2 py-1.5 mt-1 text-[12px] transition-colors rounded"
-                    style={{ color: N.muted }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = N.hover)}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-                    <span style={{ transform: showDone ? "rotate(90deg)" : "none", transition: "transform 0.15s", display: "inline-block" }}>
-                      <Ico.chevR />
-                    </span>
-                    {doneTasks.length} completed
-                  </button>
-                  {showDone && doneTasks.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} />)}
-                </>
-              )}
-            </div>
-          </div>
+          {/* ── 2-Column Grid ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
 
-          {/* ── Exams ── */}
-          <div className="mb-6">
-            <SectionTitle label="Upcoming Exams" count={exams.length > 0 ? exams.length : undefined}
-              action={
-                <GhostBtn onClick={() => setModal("exam")}>
-                  <Ico.plus /> New exam
-                </GhostBtn>
-              }
-            />
-            <Divider />
-            <div className="mt-1">
-              {exams.length === 0
-                ? <p className="text-[13px] py-3 px-2" style={{ color: N.muted }}>No upcoming exams</p>
-                : exams.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} />)
-              }
-            </div>
-          </div>
+            {/* ── Left: Tasks + Assignments ── */}
+            <div className="lg:col-span-3 space-y-5">
 
-          {/* ── Assignments ── */}
-          <div className="mb-6">
-            <SectionTitle label="Assignments" count={homework.length > 0 ? homework.length : undefined}
-              action={
-                <GhostBtn onClick={() => setModal("task")}>
-                  <Ico.plus /> New
-                </GhostBtn>
-              }
-            />
-            <Divider />
-            <div className="mt-1">
-              {homework.length === 0
-                ? <p className="text-[13px] py-3 px-2" style={{ color: N.muted }}>No assignments 🎉</p>
-                : homework.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} />)
-              }
-            </div>
-          </div>
-
-          {/* ── Calendar ── */}
-          <div className="mb-6">
-            <SectionTitle label="Calendar"
-              action={
-                <GhostBtn onClick={() => setModal("event")}>
-                  <Ico.plus /> New event
-                </GhostBtn>
-              }
-            />
-            <Divider />
-            <div className="mt-3">
-              <WeekStrip
-                weekOffset={weekOffset} setWeekOffset={setWeekOffset}
-                selectedDate={selectedDate} onSelectDate={setSelectedDate}
-                eventCounts={eventCounts}
-              />
-              {selectedEvents.length > 0 && (
-                <div className="mt-3 space-y-0.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-widest px-2 mb-1" style={{ color: N.muted }}>
-                    {selObj.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
-                  </p>
-                  {selectedEvents.map((ev) => {
-                    const t = TYPES[ev.type] ?? TYPES.personal;
-                    return (
-                      <div key={ev.id}
-                        className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg transition-colors group"
-                        style={{ background: "transparent" }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = N.hover)}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: t.accent }} />
-                        <span className="flex-1 text-[13px]" style={{ color: N.text }}>{ev.title}</span>
-                        <span className="text-[11px]" style={{ color: N.muted }}>
-                          {formatTime(ev.start_time)}{ev.end_time ? ` – ${formatTime(ev.end_time)}` : ""}
-                        </span>
-                        <PropChip bg={t.bg} color={t.text}>{t.label}</PropChip>
-                        <button onClick={() => deleteEvent(ev.id)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: N.border }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = N.border)}>
-                          <Ico.trash />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {selectedEvents.length === 0 && (
-                <p className="text-[13px] px-2 mt-2" style={{ color: N.muted }}>
-                  No events for {selObj.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* ── Study Progress ── */}
-          <div className="mb-6">
-            <SectionTitle label="Study Progress"
-              action={
-                <GhostBtn onClick={() => setModal("study")}>
-                  <Ico.plus /> Log session
-                </GhostBtn>
-              }
-            />
-            <Divider />
-            <div className="mt-3 space-y-4">
-              {/* Weekly activity chart */}
-              <WeeklyBarChart studyLogs={studyLogs} />
-
-              <Divider />
-
-              {/* Per-subject progress */}
-              {subjects.length === 0 ? (
-                <p className="text-[13px] px-2" style={{ color: N.muted }}>Create a semester to track study progress</p>
-              ) : (
-                <div className="space-y-2.5">
-                  {subjects.map((s) => {
-                    const logged = weeklyHours[s.id] ?? 0;
-                    return (
-                      <div key={s.id} className="flex items-center gap-3">
-                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                        <span className="text-[13px] flex-1 truncate" style={{ color: N.text }}>{s.name}</span>
-                        <span className="text-[12px] tabular-nums flex-shrink-0 font-medium" style={{ color: logged > 0 ? N.text : N.muted }}>
-                          {logged > 0 ? `${logged.toFixed(1)}h this week` : "—"}
-                        </span>
-                      </div>
-                    );
-                  })}
-                  <div className="flex items-center justify-between pt-1 mt-1" style={{ borderTop: `1px solid ${N.border}` }}>
-                    <span className="text-[12px]" style={{ color: N.muted }}>Weekly total</span>
-                    <span className="text-[13px] font-semibold" style={{ color: N.text }}>
-                      {totalHrsThisWeek.toFixed(1)}h studied
-                    </span>
+              {/* Tasks */}
+              <div className="rounded-2xl p-5" style={{ background: "white", boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-[15px] font-bold" style={{ color: N.text }}>Tasks</h2>
+                    {tasksOnly.length > 0 && (
+                      <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold"
+                        style={{ background: "#DBEAFE", color: "#1D4ED8" }}>{tasksOnly.length}</span>
+                    )}
                   </div>
+                  <button onClick={() => setModal("task")}
+                    className="flex items-center gap-1 text-[12px] font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                    style={{ background: N.hover, color: N.text }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = N.active)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = N.hover)}>
+                    <Ico.plus /> New task
+                  </button>
                 </div>
-              )}
+                {tasksLoading ? (
+                  [1,2,3].map((i) => <div key={i} className="h-11 rounded-xl animate-pulse mb-2" style={{ background: N.hover }} />)
+                ) : tasksOnly.length === 0 ? (
+                  <div className="text-center py-6">
+                    <p className="text-[13px]" style={{ color: N.muted }}>All clear! No tasks this week 🎉</p>
+                  </div>
+                ) : (
+                  tasksOnly.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} subjects={subjects} />)
+                )}
+                {doneTasks.length > 0 && (
+                  <>
+                    <button onClick={() => setShowDone(!showDone)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 mt-2 text-[12px] font-medium transition-colors rounded-lg w-full"
+                      style={{ color: N.muted }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = N.hover)}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                      <span style={{ transform: showDone ? "rotate(90deg)" : "none", transition: "transform 0.15s", display: "inline-block" }}>
+                        <Ico.chevR />
+                      </span>
+                      {doneTasks.length} completed
+                    </button>
+                    {showDone && doneTasks.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} subjects={subjects} />)}
+                  </>
+                )}
+              </div>
 
-              <Divider />
+              {/* Assignments */}
+              <div className="rounded-2xl p-5" style={{ background: "white", boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-[15px] font-bold" style={{ color: N.text }}>Assignments</h2>
+                    {homework.length > 0 && (
+                      <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold"
+                        style={{ background: "#EFF6FF", color: "#1D4ED8" }}>{homework.length}</span>
+                    )}
+                  </div>
+                  <button onClick={() => setModal("task")}
+                    className="flex items-center gap-1 text-[12px] font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                    style={{ background: N.hover, color: N.text }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = N.active)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = N.hover)}>
+                    <Ico.plus /> New
+                  </button>
+                </div>
+                {homework.length === 0 ? (
+                  <div className="text-center py-6">
+                    <p className="text-[13px]" style={{ color: N.muted }}>No assignments due this week 🎉</p>
+                  </div>
+                ) : (
+                  homework.map((t) => <TaskRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onUpdateQuestions={updateTaskQuestions} subjects={subjects} />)
+                )}
+              </div>
+
+            </div>
+
+            {/* ── Right: Exams + Study + Calendar ── */}
+            <div className="lg:col-span-2 space-y-5">
+
+              {/* Upcoming Exams */}
+              <div className="rounded-2xl p-5" style={{ background: "white", boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-[15px] font-bold" style={{ color: N.text }}>Upcoming Exams</h2>
+                    {exams.length > 0 && (
+                      <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold"
+                        style={{ background: "#FFEDD5", color: "#C2410C" }}>{exams.length}</span>
+                    )}
+                  </div>
+                  <button onClick={() => setModal("exam")}
+                    className="flex items-center gap-1 text-[12px] font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                    style={{ background: N.hover, color: N.text }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = N.active)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = N.hover)}>
+                    <Ico.plus /> New
+                  </button>
+                </div>
+                {exams.length === 0 ? (
+                  <p className="text-center py-4 text-[13px]" style={{ color: N.muted }}>No exams in the next 7 days</p>
+                ) : (
+                  <div className="space-y-2">
+                    {exams.map((exam) => {
+                      const [ey, em, ed] = exam.deadline.split("-").map(Number);
+                      const daysLeft = Math.ceil((new Date(ey, em - 1, ed).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                      const subColor = subjects.find((s) => s.name === exam.subject)?.color;
+                      const urgentColor = daysLeft <= 1 ? "#EF4444" : daysLeft <= 3 ? "#F97316" : "#6366F1";
+                      return (
+                        <div key={exam.id} className="flex items-center gap-3 p-3 rounded-xl transition-colors"
+                          style={{ background: N.hover, border: `1px solid ${N.border}` }}>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-semibold truncate" style={{ color: N.text }}>{exam.name}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {subColor && <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: subColor }} />}
+                              {exam.subject && <span className="text-[11px] truncate" style={{ color: N.muted }}>{exam.subject}</span>}
+                              <span className="text-[11px]" style={{ color: N.muted }}>· {exam.deadline}</span>
+                            </div>
+                          </div>
+                          <div className="flex-shrink-0 text-right">
+                            <span className="text-[13px] font-bold px-2 py-0.5 rounded-lg"
+                              style={{ background: urgentColor + "18", color: urgentColor }}>
+                              {daysLeft === 0 ? "Today!" : daysLeft === 1 ? "Tomorrow" : `${daysLeft}d`}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Study Progress */}
+              <div className="rounded-2xl p-5" style={{ background: "white", boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-[15px] font-bold" style={{ color: N.text }}>Study Progress</h2>
+                  <button onClick={() => setModal("study")}
+                    className="flex items-center gap-1 text-[12px] font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                    style={{ background: N.hover, color: N.text }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = N.active)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = N.hover)}>
+                    <Ico.plus /> Log
+                  </button>
+                </div>
+                <WeeklyBarChart studyLogs={studyLogs} />
+                {subjects.length > 0 && (
+                  <div className="mt-4 space-y-2 pt-3" style={{ borderTop: `1px solid ${N.border}` }}>
+                    {subjects.map((s) => {
+                      const logged = weeklyHours[s.id] ?? 0;
+                      return (
+                        <div key={s.id} className="flex items-center gap-2.5">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                          <span className="text-[12px] flex-1 truncate" style={{ color: N.text }}>{s.name}</span>
+                          <span className="text-[12px] font-semibold tabular-nums"
+                            style={{ color: logged > 0 ? N.accent : N.muted }}>
+                            {logged > 0 ? `${logged.toFixed(1)}h` : "—"}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    <div className="flex items-center justify-between pt-2" style={{ borderTop: `1px solid ${N.border}` }}>
+                      <span className="text-[11px]" style={{ color: N.muted }}>Total this week</span>
+                      <span className="text-[13px] font-bold" style={{ color: N.text }}>
+                        {totalHrsThisWeek.toFixed(1)}h
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {subjects.length === 0 && (
+                  <p className="text-[12px] mt-2" style={{ color: N.muted }}>Create a semester to track study progress</p>
+                )}
+              </div>
+
+              {/* Calendar */}
+              <div className="rounded-2xl p-5" style={{ background: "white", boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-[15px] font-bold" style={{ color: N.text }}>Calendar</h2>
+                  <button onClick={() => setModal("event")}
+                    className="flex items-center gap-1 text-[12px] font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                    style={{ background: N.hover, color: N.text }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = N.active)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = N.hover)}>
+                    <Ico.plus /> Event
+                  </button>
+                </div>
+                <WeekStrip
+                  weekOffset={weekOffset} setWeekOffset={setWeekOffset}
+                  selectedDate={selectedDate} onSelectDate={setSelectedDate}
+                  eventCounts={eventCounts}
+                />
+                {selectedEvents.length > 0 ? (
+                  <div className="mt-3 space-y-1.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: N.muted }}>
+                      {selObj.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                    </p>
+                    {selectedEvents.map((ev) => {
+                      const t = TYPES[ev.type] ?? TYPES.personal;
+                      return (
+                        <div key={ev.id}
+                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-colors group"
+                          style={{ background: t.bg }}>
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: t.accent }} />
+                          <span className="flex-1 text-[12px] font-medium truncate" style={{ color: N.text }}>{ev.title}</span>
+                          <span className="text-[10px] font-semibold flex-shrink-0" style={{ color: t.text }}>{t.label}</span>
+                          <button onClick={() => deleteEvent(ev.id)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            style={{ color: N.muted }}
+                            onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")}
+                            onMouseLeave={(e) => (e.currentTarget.style.color = N.muted)}>
+                            <Ico.trash />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-[12px] text-center py-3 mt-2" style={{ color: N.muted }}>
+                    No events · {selObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </p>
+                )}
+              </div>
 
               {/* Pomodoro */}
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: N.muted }}>Focus Timer</p>
+              <div className="rounded-2xl p-5" style={{ background: "white", boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
+                <h2 className="text-[14px] font-bold mb-3" style={{ color: N.text }}>Focus Timer</h2>
                 <PomodoroTimer />
               </div>
+
             </div>
           </div>
-
         </div>
       </main>
 
-      {/* ── FAB (mobile only) ── */}
-      <div className="lg:hidden">
-        <FAB onAddTask={() => setModal("task")} onAddExam={() => setModal("exam")} onAddEvent={() => setModal("event")} />
-      </div>
+      {/* ── FAB ── */}
+      <FAB
+        onAddTask={() => setModal("task")}
+        onAddExam={() => setModal("exam")}
+        onAddEvent={() => setModal("event")}
+        onLogStudy={() => setModal("study")}
+      />
 
       {/* ── Modals ── */}
       {modal === "semester"     && <CreateSemesterModal onClose={() => setModal(null)} onCreate={createSemester} />}
