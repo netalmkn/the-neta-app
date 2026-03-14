@@ -347,7 +347,7 @@ function CreateSemesterModal({ onClose, onCreate }: {
                 onChange={(e) => update(i, "target_hours", Number(e.target.value))}
                 className="w-14 rounded-xl px-2 py-2 text-[13px] text-center outline-none"
                 style={{ background: "#F9FAFB", border: "1.5px solid #E5E7EB", color: "#111827" }} />
-              <span className="text-[10px] w-3 flex-shrink-0" style={{ color: "#9CA3AF" }}>h</span>
+              <span className="text-[10px] w-4 flex-shrink-0" style={{ color: "#9CA3AF" }}>cr</span>
               <button onClick={() => setSubjects((p) => p.filter((_, idx) => idx !== i))}
                 className="text-gray-300 hover:text-gray-500 flex-shrink-0">
                 <Icon.x />
@@ -472,7 +472,7 @@ function WeeklyBarChart({ studyLogs }: { studyLogs: StudyLog[] }) {
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-[13px] font-bold" style={{ color: "#111827" }}>Weekly Activity</h3>
         <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "#EEF2FF", color: "#4F46E5" }}>
-          {hoursByDay.reduce((a, b) => a + b, 0).toFixed(1)}h this week
+          {hoursByDay.reduce((a, b) => a + b, 0).toFixed(1)}cr this week
         </span>
       </div>
       <div className="flex items-end gap-2" style={{ height: 72 }}>
@@ -545,8 +545,8 @@ function StudyProgress({ subjects, weeklyHours, onLogStudy }: {
               </div>
             </div>
             <div>
-              <p className="text-[22px] font-extrabold leading-none" style={{ color: "#111827" }}>{totalLogged.toFixed(1)}<span className="text-[13px] font-semibold ml-0.5" style={{ color: "#9CA3AF" }}>h</span></p>
-              <p className="text-[11px] mt-0.5" style={{ color: "#9CA3AF" }}>of {totalTarget}h weekly goal</p>
+              <p className="text-[22px] font-extrabold leading-none" style={{ color: "#111827" }}>{totalLogged.toFixed(1)}<span className="text-[13px] font-semibold ml-0.5" style={{ color: "#9CA3AF" }}>cr</span></p>
+              <p className="text-[11px] mt-0.5" style={{ color: "#9CA3AF" }}>of {totalTarget}cr weekly goal</p>
             </div>
           </div>
 
@@ -635,19 +635,19 @@ function LogStudyModal({ subjects, onClose, onLog }: {
                   }}>
                   <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
                   {s.name}
-                  <span className="ml-auto text-[11px]" style={{ color: "#9CA3AF" }}>goal: {s.target_hours}h/wk</span>
+                  <span className="ml-auto text-[11px]" style={{ color: "#9CA3AF" }}>goal: {s.target_hours}cr/wk</span>
                 </button>
               ))}
             </div>
           </div>
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: "#9CA3AF" }}>Hours studied</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: "#9CA3AF" }}>Credits studied</p>
             <div className="flex items-center gap-2">
               {[0.5, 1, 1.5, 2, 3].map((h) => (
                 <button key={h} onClick={() => setHours(String(h))}
                   className="flex-1 py-2 rounded-xl text-[12px] font-semibold transition active:scale-95"
                   style={{ background: hours === String(h) ? "#4F46E5" : "#F3F4F6", color: hours === String(h) ? "white" : "#6B7280" }}>
-                  {h}h
+                  {h}cr
                 </button>
               ))}
             </div>
