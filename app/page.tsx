@@ -15,6 +15,7 @@ interface Task {
   type: EventType;
   deadline: string;
   done: boolean;
+  subject?: string | null;
   semester_id?: string | null;
   created_at?: string;
 }
@@ -166,15 +167,13 @@ function Divider() {
   return <div style={{ height: 1, background: N.border, margin: "2px 0" }} />;
 }
 
-/** Notion-style section title: emoji + label */
-function SectionTitle({ emoji, label, count, action }: { emoji: string; label: string; count?: number; action?: React.ReactNode }) {
+function SectionTitle({ label, count, action }: { label: string; count?: number; action?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between mb-1" style={{ padding: "6px 0 4px" }}>
       <div className="flex items-center gap-1.5">
-        <span style={{ fontSize: 15 }}>{emoji}</span>
         <span className="text-[13px] font-semibold" style={{ color: N.text }}>{label}</span>
         {count !== undefined && (
-          <span className="text-[12px]" style={{ color: N.muted }}>{count}</span>
+          <span className="text-[12px] tabular-nums px-1.5 py-0.5 rounded-md" style={{ background: N.hover, color: N.muted }}>{count}</span>
         )}
       </div>
       {action}
@@ -245,7 +244,6 @@ function SemesterPicker({ semesters, activeSemesterId, onSwitch, onCreate, onDel
         onMouseEnter={(e) => { if (!open) e.currentTarget.style.background = N.hover; }}
         onMouseLeave={(e) => { if (!open) e.currentTarget.style.background = "transparent"; }}>
         <div className="flex items-center gap-1.5 min-w-0">
-          <span>📅</span>
           <span className="truncate">{active ? active.name : "No semester"}</span>
         </div>
         <span style={{ opacity: 0.5, flexShrink: 0 }}><Ico.chevD /></span>
@@ -297,12 +295,20 @@ function SemesterPicker({ semesters, activeSemesterId, onSwitch, onCreate, onDel
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
-  { href: "/",          label: "Dashboard", emoji: "🏠" },
-  { href: "/tasks",     label: "Tasks",     emoji: "✅" },
-  { href: "/homework",  label: "Homework",  emoji: "📖" },
-  { href: "/exams",     label: "Exams",     emoji: "📝" },
-  { href: "/calendar",  label: "Calendar",  emoji: "🗓" },
+  { href: "/",          label: "Dashboard" },
+  { href: "/tasks",     label: "Tasks"     },
+  { href: "/homework",  label: "Homework"  },
+  { href: "/exams",     label: "Exams"     },
+  { href: "/calendar",  label: "Calendar"  },
 ] as const;
+
+const NAV_ICONS_MAP: Record<string, React.ReactNode> = {
+  "/":         <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 12L5 10M5 10L12 3L19 10M5 10V20C5 20.55 5.45 21 6 21H9M19 10L21 12M19 10V20C19 20.55 18.55 21 18 21H15M9 21V15C9 15 9 15 12 15C15 15 15 15 15 21M9 21H15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  "/tasks":    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 5H7C5.9 5 5 5.9 5 7V19C5 20.1 5.9 21 7 21H17C18.1 21 19 20.1 19 19V7C19 5.9 18.1 5 17 5H15M9 5C9 5.55 9.45 6 10 6H14C14.55 6 15 5.55 15 5M9 5C9 4.45 9.45 4 10 4H14C14.55 4 15 4.45 15 5M9 12L11 14L15 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  "/homework": <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 6.25V19.25M12 6.25C10.83 5.48 9.25 5 7.5 5C5.75 5 4.17 5.48 3 6.25V19.25C4.17 18.48 5.75 18 7.5 18C9.25 18 10.83 18.48 12 19.25M12 6.25C13.17 5.48 14.75 5 16.5 5C18.25 5 19.83 5.48 21 6.25V19.25C19.83 18.48 18.25 18 16.5 18C14.75 18 13.17 18.48 12 19.25" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  "/exams":    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 5H7C5.9 5 5 5.9 5 7V19C5 20.1 5.9 21 7 21H17C18.1 21 19 20.1 19 19V7C19 5.9 18.1 5 17 5H15M9 5C9 5.55 9.45 6 10 6H14C14.55 6 15 5.55 15 5M9 5C9 4.45 9.45 4 10 4H14C14.55 4 15 4.45 15 5M9 12H15M9 16H12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  "/calendar": <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.6"/><path d="M8 2V6M16 2V6M3 10H21" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/><path d="M8 14H8.01M12 14H12.01M16 14H16.01M8 18H8.01M12 18H12.01" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/></svg>,
+};
 
 function SidebarContent({ semesters, activeSemesterId, onSwitchSemester, onCreateSemester, onDeleteSemester, onClose }: {
   semesters: Semester[];
@@ -314,13 +320,13 @@ function SidebarContent({ semesters, activeSemesterId, onSwitchSemester, onCreat
 }) {
   const pathname = usePathname();
   return (
-    <div className="flex flex-col h-full py-3 px-2" style={{ background: N.sidebar }}>
+    <div className="flex flex-col h-full py-4 px-3" style={{ background: N.sidebar }}>
       {/* Workspace header */}
-      <div className="flex items-center justify-between px-2 py-1.5 mb-1">
+      <div className="flex items-center justify-between px-1 mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded flex items-center justify-center text-[11px]"
-            style={{ background: N.text, color: "white", fontWeight: 700 }}>N</div>
-          <span className="text-[13px] font-semibold" style={{ color: N.text }}>Neta's Study</span>
+          <div className="w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold"
+            style={{ background: N.accent, color: "white" }}>N</div>
+          <span className="text-[13px] font-semibold" style={{ color: N.text }}>Neta&apos;s Study</span>
         </div>
         {onClose && (
           <button onClick={onClose} className="p-1 rounded transition-colors lg:hidden"
@@ -333,7 +339,8 @@ function SidebarContent({ semesters, activeSemesterId, onSwitchSemester, onCreat
       </div>
 
       {/* Semester picker */}
-      <div className="px-1 mb-2">
+      <div className="px-1 mb-3">
+        <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5 px-1.5" style={{ color: N.muted }}>Semester</p>
         <SemesterPicker
           semesters={semesters}
           activeSemesterId={activeSemesterId}
@@ -343,33 +350,32 @@ function SidebarContent({ semesters, activeSemesterId, onSwitchSemester, onCreat
         />
       </div>
 
-      <Divider />
-      <div className="mt-1 space-y-0.5">
-        {NAV_ITEMS.map(({ href, label, emoji }) => {
+      <div style={{ height: 1, background: N.border, margin: "0 4px 12px" }} />
+      <nav className="space-y-0.5">
+        {NAV_ITEMS.map(({ href, label }) => {
           const active = pathname === href;
           return (
             <Link key={href} href={href} onClick={onClose}
-              className="flex items-center gap-2 px-2 py-1.5 rounded text-[13px] transition-colors"
-              style={{ background: active ? N.active : "transparent", color: active ? N.text : N.muted, fontWeight: active ? 500 : 400 }}
+              className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] transition-colors"
+              style={{ background: active ? N.selected : "transparent", color: active ? N.accent : N.muted, fontWeight: active ? 600 : 400 }}
               onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = N.hover; }}
-              onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = active ? N.active : "transparent"; }}>
-              <span style={{ fontSize: 14 }}>{emoji}</span>
+              onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = active ? N.selected : "transparent"; }}>
+              <span style={{ color: active ? N.accent : N.muted }}>{NAV_ICONS_MAP[href]}</span>
               {label}
             </Link>
           );
         })}
-      </div>
+      </nav>
 
       {/* User at bottom */}
       <div className="mt-auto pt-3">
-        <Divider />
-        <div className="flex items-center gap-2 px-2 py-2 mt-1 rounded transition-colors cursor-default"
-          style={{ color: N.muted }}
+        <div style={{ height: 1, background: N.border, marginBottom: 8 }} />
+        <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg transition-colors cursor-default"
           onMouseEnter={(e) => (e.currentTarget.style.background = N.hover)}
           onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-          <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
-            style={{ background: "#2383E2", color: "white" }}>N</div>
-          <span className="text-[12px]" style={{ color: N.text }}>Neta</span>
+          <div className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
+            style={{ background: N.accent, color: "white" }}>N</div>
+          <span className="text-[13px]" style={{ color: N.text }}>Neta</span>
         </div>
       </div>
     </div>
@@ -410,7 +416,7 @@ function CreateSemesterModal({ onClose, onCreate }: {
         {/* Handle (mobile) */}
         <div className="w-8 h-1 rounded-full mx-auto mt-3 lg:hidden" style={{ background: N.border }} />
         <div className="px-6 py-5">
-          <div className="text-[20px] mb-0.5">📅</div>
+          
           <h3 className="text-[18px] font-bold mb-1" style={{ color: N.text }}>New Semester</h3>
           <p className="text-[13px] mb-5" style={{ color: N.muted }}>{semName}</p>
 
@@ -588,7 +594,7 @@ function LogStudyModal({ subjects, onClose, onLog }: {
         style={{ background: N.bg, border: `1px solid ${N.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.14)", maxHeight: "90vh" }}>
         <div className="w-8 h-1 rounded-full mx-auto mt-3 lg:hidden" style={{ background: N.border }} />
         <div className="px-5 py-5">
-          <div className="text-[18px] mb-0.5">⏱</div>
+          
           <h3 className="text-[17px] font-bold mb-4" style={{ color: N.text }}>Log Study Session</h3>
           <div className="space-y-4">
             <div>
@@ -822,54 +828,86 @@ function FAB({ onAddTask, onAddExam, onAddEvent }: { onAddTask: () => void; onAd
 
 // ─── Modals ───────────────────────────────────────────────────────────────────
 
-function AddTaskModal({ onClose, onAdd, defaultType = "homework" }: {
+function AddTaskModal({ onClose, onAdd, defaultType = "homework", subjects }: {
   onClose: () => void;
   onAdd: (t: Omit<Task, "id" | "done" | "created_at">) => Promise<void>;
   defaultType?: EventType;
+  subjects?: SemesterSubject[];
 }) {
   const [name, setName] = useState("");
   const [type, setType] = useState<EventType>(defaultType);
   const [deadline, setDeadline] = useState("");
+  const [subject, setSubject] = useState(subjects?.[0]?.name ?? "");
   const [saving, setSaving] = useState(false);
+
+  const modalTitle = defaultType === "exam" ? "New Exam" : defaultType === "homework" ? "New Assignment" : "New Task";
 
   const handleAdd = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    await onAdd({ name: name.trim(), type, deadline: deadline.trim() || "No deadline" });
+    await onAdd({ name: name.trim(), type, deadline: deadline || "No deadline", subject: subject || null });
     setSaving(false);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end lg:items-center lg:justify-center">
       <div className="overlay-enter absolute inset-0 bg-black/20" onClick={onClose} />
-      <div className="modal-enter relative w-full lg:max-w-md rounded-t-2xl lg:rounded-xl"
+      <div className="modal-enter relative w-full lg:max-w-md rounded-t-2xl lg:rounded-2xl"
         style={{ background: N.bg, border: `1px solid ${N.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.14)" }}>
         <div className="w-8 h-1 rounded-full mx-auto mt-3 lg:hidden" style={{ background: N.border }} />
         <div className="px-5 py-5 pb-10 lg:pb-5">
-          <div className="text-[18px] mb-0.5">✅</div>
-          <h3 className="text-[17px] font-bold mb-4" style={{ color: N.text }}>New Task</h3>
+          <h3 className="text-[17px] font-bold mb-4" style={{ color: N.text }}>{modalTitle}</h3>
           <div className="space-y-3">
-            <input autoFocus type="text" placeholder="Task name" value={name}
+            <input autoFocus type="text" placeholder="Title" value={name}
               onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-              className="w-full px-3 py-2 rounded-lg text-[14px] outline-none"
+              className="w-full px-3 py-2.5 rounded-xl text-[14px] outline-none"
               style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
-            <div className="flex flex-wrap gap-1.5">
-              {(Object.keys(TYPES) as EventType[]).map((k) => (
-                <button key={k} onClick={() => setType(k)}
-                  className="px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors"
-                  style={{ background: type === k ? TYPES[k].bg : N.hover, color: type === k ? TYPES[k].text : N.muted, border: type === k ? `1.5px solid ${TYPES[k].accent}` : `1.5px solid transparent` }}>
-                  {TYPES[k].label}
-                </button>
-              ))}
+
+            {subjects && subjects.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>Subject</p>
+                <div className="flex flex-wrap gap-1.5">
+                  <button onClick={() => setSubject("")}
+                    className="px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors"
+                    style={{ background: subject === "" ? N.active : N.hover, color: subject === "" ? N.text : N.muted, border: subject === "" ? `1.5px solid ${N.border}` : "1.5px solid transparent" }}>
+                    None
+                  </button>
+                  {subjects.map((s) => (
+                    <button key={s.id} onClick={() => setSubject(s.name)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors"
+                      style={{ background: subject === s.name ? s.color + "40" : N.hover, color: subject === s.name ? N.text : N.muted, border: subject === s.name ? `1.5px solid ${s.color}` : "1.5px solid transparent" }}>
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>Type</p>
+              <div className="flex flex-wrap gap-1.5">
+                {(Object.keys(TYPES) as EventType[]).map((k) => (
+                  <button key={k} onClick={() => setType(k)}
+                    className="px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors"
+                    style={{ background: type === k ? TYPES[k].bg : N.hover, color: type === k ? TYPES[k].text : N.muted, border: type === k ? `1.5px solid ${TYPES[k].accent}` : "1.5px solid transparent" }}>
+                    {TYPES[k].label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <input type="text" placeholder="Deadline (e.g. Friday 5 PM)" value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg text-[13px] outline-none"
-              style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
+
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>Due date</p>
+              <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-[13px] outline-none"
+                style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
+            </div>
+
             <button onClick={handleAdd} disabled={saving || !name.trim()}
-              className="w-full py-2.5 rounded-lg text-[13px] font-semibold transition-colors disabled:opacity-40"
+              className="w-full py-2.5 rounded-xl text-[13px] font-semibold transition-colors disabled:opacity-40"
               style={{ background: N.text, color: "white" }}>
-              {saving ? "Saving…" : "Add Task"}
+              {saving ? "Saving…" : `Add ${defaultType === "exam" ? "Exam" : "Assignment"}`}
             </button>
           </div>
         </div>
@@ -900,7 +938,7 @@ function AddEventModal({ date, onClose, onAdd }: {
         <div className="w-8 h-1 rounded-full mx-auto mt-3 lg:hidden" style={{ background: N.border }} />
         <div className="px-5 py-5 pb-10 lg:pb-5">
           <p className="text-[11px] font-semibold uppercase tracking-widest mb-1" style={{ color: N.muted }}>{label}</p>
-          <div className="text-[18px] mb-0.5">🗓</div>
+          
           <h3 className="text-[17px] font-bold mb-4" style={{ color: N.text }}>New Event</h3>
           <div className="space-y-3">
             <input autoFocus type="text" placeholder="Event title" value={title}
@@ -1165,7 +1203,6 @@ export default function Home() {
 
           {/* ── Page header ── */}
           <div className="mb-8">
-            <div className="text-[48px] mb-2 leading-none select-none">📚</div>
             <h1 className="text-[28px] lg:text-[32px] font-bold tracking-tight mb-1" style={{ color: N.text }}>
               {greet()}, Neta
             </h1>
@@ -1210,7 +1247,7 @@ export default function Home() {
 
           {/* ── Tasks ── */}
           <div className="mb-6">
-            <SectionTitle emoji="✅" label="Tasks" count={undoneTasks.length > 0 ? undoneTasks.length : undefined}
+            <SectionTitle label="Tasks" count={undoneTasks.length > 0 ? undoneTasks.length : undefined}
               action={
                 <GhostBtn onClick={() => setModal("task")}>
                   <Ico.plus /> New task
@@ -1246,7 +1283,7 @@ export default function Home() {
 
           {/* ── Exams ── */}
           <div className="mb-6">
-            <SectionTitle emoji="📝" label="Upcoming Exams" count={exams.length > 0 ? exams.length : undefined}
+            <SectionTitle label="Upcoming Exams" count={exams.length > 0 ? exams.length : undefined}
               action={
                 <GhostBtn onClick={() => setModal("exam")}>
                   <Ico.plus /> New exam
@@ -1264,7 +1301,7 @@ export default function Home() {
 
           {/* ── Assignments ── */}
           <div className="mb-6">
-            <SectionTitle emoji="📖" label="Assignments" count={homework.length > 0 ? homework.length : undefined}
+            <SectionTitle label="Assignments" count={homework.length > 0 ? homework.length : undefined}
               action={
                 <GhostBtn onClick={() => setModal("task")}>
                   <Ico.plus /> New
@@ -1282,7 +1319,7 @@ export default function Home() {
 
           {/* ── Calendar ── */}
           <div className="mb-6">
-            <SectionTitle emoji="🗓" label="Calendar"
+            <SectionTitle label="Calendar"
               action={
                 <GhostBtn onClick={() => setModal("event")}>
                   <Ico.plus /> New event
@@ -1336,7 +1373,7 @@ export default function Home() {
 
           {/* ── Study Progress ── */}
           <div className="mb-6">
-            <SectionTitle emoji="📊" label="Study Progress"
+            <SectionTitle label="Study Progress"
               action={
                 <GhostBtn onClick={() => setModal("study")}>
                   <Ico.plus /> Log session
@@ -1385,7 +1422,7 @@ export default function Home() {
 
               {/* Pomodoro */}
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: N.muted }}>⏱ Focus Timer</p>
+                <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: N.muted }}>Focus Timer</p>
                 <PomodoroTimer />
               </div>
             </div>
@@ -1401,8 +1438,8 @@ export default function Home() {
 
       {/* ── Modals ── */}
       {modal === "semester" && <CreateSemesterModal onClose={() => setModal(null)} onCreate={createSemester} />}
-      {modal === "task"     && <AddTaskModal onClose={() => setModal(null)} onAdd={addTask} defaultType="homework" />}
-      {modal === "exam"     && <AddTaskModal onClose={() => setModal(null)} onAdd={addTask} defaultType="exam" />}
+      {modal === "task"     && <AddTaskModal onClose={() => setModal(null)} onAdd={addTask} defaultType="homework" subjects={subjects} />}
+      {modal === "exam"     && <AddTaskModal onClose={() => setModal(null)} onAdd={addTask} defaultType="exam" subjects={subjects} />}
       {modal === "event"    && <AddEventModal date={selectedDate} onClose={() => setModal(null)} onAdd={addEvent} />}
       {modal === "study"    && <LogStudyModal subjects={subjects} onClose={() => setModal(null)} onLog={addStudyLog} />}
     </div>

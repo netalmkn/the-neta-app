@@ -13,6 +13,7 @@ interface CalendarEvent {
   title: string;
   start_time: string;
   end_time: string;
+  all_day?: boolean | null;
   type: EventType;
   created_at?: string;
 }
@@ -73,6 +74,7 @@ function AddEventModal({ date, onClose, onAdd }: {
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("10:00");
   const [eventDate, setEventDate] = useState(date);
+  const [allDay, setAllDay] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [y, m, d] = date.split("-").map(Number);
@@ -86,7 +88,6 @@ function AddEventModal({ date, onClose, onAdd }: {
         <div className="w-8 h-1 rounded-full mx-auto mt-3 lg:hidden" style={{ background: N.border }} />
         <div className="px-5 py-5 pb-10 lg:pb-5">
           <p className="text-[11px] font-semibold uppercase tracking-widest mb-1" style={{ color: N.muted }}>{label}</p>
-          <div className="text-[18px] mb-0.5">🗓</div>
           <h3 className="text-[17px] font-bold mb-4" style={{ color: N.text }}>New Event</h3>
           <div className="space-y-3">
             <input autoFocus type="text" placeholder="Event title" value={title}
@@ -101,6 +102,18 @@ function AddEventModal({ date, onClose, onAdd }: {
                 className="w-full px-3 py-1.5 rounded-xl text-[13px] outline-none"
                 style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
             </div>
+
+            {/* All-day toggle */}
+            <button onClick={() => setAllDay(!allDay)}
+              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl transition-colors text-[13px]"
+              style={{ background: allDay ? N.selected : N.hover, color: N.text }}>
+              <div className="w-8 h-5 rounded-full relative transition-colors flex-shrink-0"
+                style={{ background: allDay ? N.accent : N.border }}>
+                <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
+                  style={{ left: allDay ? "calc(100% - 18px)" : 2 }} />
+              </div>
+              All day
+            </button>
 
             {/* Type */}
             <div className="flex flex-wrap gap-1.5">
@@ -117,25 +130,34 @@ function AddEventModal({ date, onClose, onAdd }: {
               ))}
             </div>
 
-            {/* Times */}
-            <div className="grid grid-cols-2 gap-2">
-              {([["Start", startTime, setStartTime], ["End", endTime, setEndTime]] as const).map(([lbl, val, set]) => (
-                <div key={lbl}>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: N.muted }}>{lbl}</p>
-                  <select value={val} onChange={(e) => (set as (v: string) => void)(e.target.value)}
-                    className="w-full px-2 py-1.5 rounded-xl text-[13px] outline-none"
-                    style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }}>
-                    {TIME_OPTIONS.map((t) => <option key={t} value={t}>{formatTime(t)}</option>)}
-                  </select>
-                </div>
-              ))}
-            </div>
+            {/* Times — hidden when all day */}
+            {!allDay && (
+              <div className="grid grid-cols-2 gap-2">
+                {([["Start", startTime, setStartTime], ["End", endTime, setEndTime]] as const).map(([lbl, val, set]) => (
+                  <div key={lbl}>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: N.muted }}>{lbl}</p>
+                    <select value={val} onChange={(e) => (set as (v: string) => void)(e.target.value)}
+                      className="w-full px-2 py-1.5 rounded-xl text-[13px] outline-none"
+                      style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }}>
+                      {TIME_OPTIONS.map((t) => <option key={t} value={t}>{formatTime(t)}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <button
               onClick={async () => {
                 if (!title.trim()) return;
                 setSaving(true);
-                await onAdd({ date: eventDate, title: title.trim(), start_time: startTime, end_time: endTime, type });
+                await onAdd({
+                  date: eventDate,
+                  title: title.trim(),
+                  start_time: allDay ? "00:00" : startTime,
+                  end_time: allDay ? "23:59" : endTime,
+                  all_day: allDay,
+                  type,
+                });
                 setSaving(false);
               }}
               disabled={saving || !title.trim()}
@@ -359,7 +381,7 @@ export default function CalendarPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-semibold truncate" style={{ color: N.text }}>{ev.title}</p>
                     <p className="text-[11px] mt-0.5" style={{ color: N.muted }}>
-                      {formatTime(ev.start_time)}{ev.end_time ? ` – ${formatTime(ev.end_time)}` : ""}
+                      {ev.all_day ? "All day" : `${formatTime(ev.start_time)}${ev.end_time ? ` – ${formatTime(ev.end_time)}` : ""}`}
                     </p>
                   </div>
                   <span className="text-[11px] px-2 py-0.5 rounded-lg font-semibold flex-shrink-0"
