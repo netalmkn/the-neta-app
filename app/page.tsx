@@ -46,6 +46,8 @@ interface Semester {
   name: string;
   year: number;
   semester: number;
+  start_date?: string | null;
+  end_date?: string | null;
   created_at?: string;
 }
 
@@ -378,7 +380,21 @@ function SidebarContent({ semesters, activeSemesterId, onSwitchSemester, onCreat
 
       {/* Semester picker */}
       <div className="px-1 mb-3">
-        <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5 px-1.5" style={{ color: N.muted }}>Semester</p>
+        <div className="flex items-center justify-between mb-1.5 px-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: N.muted }}>Semester</p>
+          {activeSemesterId && onEditSemester && (
+            <button onClick={onEditSemester}
+              className="p-1 rounded transition-colors"
+              style={{ color: N.muted }}
+              title="Edit courses"
+              onMouseEnter={(e) => (e.currentTarget.style.background = N.hover)}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                <path d="M11 4H4C3.47 4 2.96 4.21 2.59 4.59C2.21 4.96 2 5.47 2 6V20C2 20.53 2.21 21.04 2.59 21.41C2.96 21.79 3.47 22 4 22H18C18.53 22 19.04 21.79 19.41 21.41C19.79 21.04 20 20.53 20 20V13M18.5 2.5C18.9 2.1 19.44 1.88 20 1.88C20.56 1.88 21.1 2.1 21.5 2.5C21.9 2.9 22.12 3.44 22.12 4C22.12 4.56 21.9 5.1 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          )}
+        </div>
         <SemesterPicker
           semesters={semesters}
           activeSemesterId={activeSemesterId}
@@ -425,7 +441,7 @@ function SidebarContent({ semesters, activeSemesterId, onSwitchSemester, onCreat
 
 function CreateSemesterModal({ onClose, onCreate }: {
   onClose: () => void;
-  onCreate: (name: string, year: number, semester: number, subjects: { name: string; credits: number; color: string }[]) => Promise<void>;
+  onCreate: (name: string, year: number, semester: number, subjects: { name: string; credits: number; color: string }[], startDate: string, endDate: string) => Promise<void>;
 }) {
   const [year, setYear] = useState(1);
   const [sem, setSem] = useState(1);
@@ -434,6 +450,8 @@ function CreateSemesterModal({ onClose, onCreate }: {
     { name: "", credits: 4, color: SUBJECT_COLORS[1] },
     { name: "", credits: 4, color: SUBJECT_COLORS[2] },
   ]);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [saving, setSaving] = useState(false);
 
   const semName = `Year ${year} · Semester ${sem}`;
@@ -443,7 +461,7 @@ function CreateSemesterModal({ onClose, onCreate }: {
   const handleCreate = async () => {
     const valid = subjects.filter((s) => s.name.trim());
     setSaving(true);
-    await onCreate(semName, year, sem, valid);
+    await onCreate(semName, year, sem, valid, startDate, endDate);
     setSaving(false);
   };
 
@@ -478,6 +496,18 @@ function CreateSemesterModal({ onClose, onCreate }: {
                 style={{ background: sem === s ? N.text : N.hover, color: sem === s ? "white" : N.muted }}>
                 {s}
               </button>
+            ))}
+          </div>
+
+          <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: N.muted }}>Dates</p>
+          <div className="grid grid-cols-2 gap-2 mb-5">
+            {([["Start", startDate, setStartDate], ["End", endDate, setEndDate]] as const).map(([lbl, val, set]) => (
+              <div key={lbl}>
+                <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: N.muted }}>{lbl}</p>
+                <input type="date" value={val} onChange={(e) => (set as (v: string) => void)(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-lg text-[13px] outline-none"
+                  style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
+              </div>
             ))}
           </div>
 
@@ -525,15 +555,20 @@ function CreateSemesterModal({ onClose, onCreate }: {
 
 // ─── Edit Semester Modal ──────────────────────────────────────────────────────
 
-function EditSemesterModal({ semesterName, existingSubjects, onClose, onAddSubjects }: {
+function EditSemesterModal({ semesterName, activeSemester, existingSubjects, onClose, onAddSubjects, onUpdateDates }: {
   semesterName: string;
+  activeSemester: Semester;
   existingSubjects: SemesterSubject[];
   onClose: () => void;
   onAddSubjects: (subjects: { name: string; credits: number; color: string }[]) => Promise<void>;
+  onUpdateDates: (startDate: string, endDate: string) => Promise<void>;
 }) {
   const [newSubjects, setNewSubjects] = useState([
     { name: "", credits: 4, color: SUBJECT_COLORS[existingSubjects.length % SUBJECT_COLORS.length] },
   ]);
+  const [startDate, setStartDate] = useState(activeSemester.start_date ?? "");
+  const [endDate, setEndDate] = useState(activeSemester.end_date ?? "");
+  const [savingDates, setSavingDates] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const update = (i: number, field: string, value: string | number) =>
@@ -556,6 +591,27 @@ function EditSemesterModal({ semesterName, existingSubjects, onClose, onAddSubje
         <div className="px-6 py-5">
           <h3 className="text-[18px] font-bold mb-1" style={{ color: N.text }}>Edit Semester</h3>
           <p className="text-[13px] mb-5" style={{ color: N.muted }}>{semesterName}</p>
+
+          {/* Semester dates */}
+          <div className="mb-5">
+            <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: N.muted }}>Semester Dates</p>
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              {([["Start", startDate, setStartDate], ["End", endDate, setEndDate]] as const).map(([lbl, val, set]) => (
+                <div key={lbl}>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: N.muted }}>{lbl}</p>
+                  <input type="date" value={val} onChange={(e) => (set as (v: string) => void)(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-lg text-[13px] outline-none"
+                    style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
+                </div>
+              ))}
+            </div>
+            <button onClick={async () => { setSavingDates(true); await onUpdateDates(startDate, endDate); setSavingDates(false); }}
+              disabled={savingDates}
+              className="w-full py-1.5 rounded-lg text-[12px] font-semibold transition-colors disabled:opacity-50"
+              style={{ background: N.hover, color: N.text }}>
+              {savingDates ? "Saving…" : "Save dates"}
+            </button>
+          </div>
 
           {/* Existing subjects — read-only */}
           {existingSubjects.length > 0 && (
@@ -1210,8 +1266,8 @@ export default function Home() {
 
   const switchSemester = (id: string) => { setActiveSemesterId(id); setTasks([]); setStudyLogs([]); };
 
-  const createSemester = async (name: string, year: number, semester: number, newSubjects: { name: string; credits: number; color: string }[]) => {
-    const { data: semData } = await supabase.from("semesters").insert({ name, year, semester }).select().single();
+  const createSemester = async (name: string, year: number, semester: number, newSubjects: { name: string; credits: number; color: string }[], startDate: string, endDate: string) => {
+    const { data: semData } = await supabase.from("semesters").insert({ name, year, semester, start_date: startDate || null, end_date: endDate || null }).select().single();
     if (!semData) return;
     const sem = semData as Semester;
     setSemesters((p) => [...p, sem]);
@@ -1221,6 +1277,13 @@ export default function Home() {
       const { data: subData } = await supabase.from("semester_subjects").insert(newSubjects.map((s) => ({ ...s, semester_id: sem.id }))).select();
       if (subData) setSubjects(subData as SemesterSubject[]);
     }
+    setModal(null);
+  };
+
+  const updateSemesterDates = async (startDate: string, endDate: string) => {
+    if (!activeSemesterId) return;
+    await supabase.from("semesters").update({ start_date: startDate || null, end_date: endDate || null }).eq("id", activeSemesterId);
+    setSemesters((p) => p.map((s) => s.id === activeSemesterId ? { ...s, start_date: startDate || null, end_date: endDate || null } : s));
     setModal(null);
   };
 
@@ -1645,9 +1708,11 @@ export default function Home() {
       {modal === "editSemester" && activeSemesterId && (
         <EditSemesterModal
           semesterName={activeSemesterName ?? ""}
+          activeSemester={semesters.find((s) => s.id === activeSemesterId)!}
           existingSubjects={subjects}
           onClose={() => setModal(null)}
           onAddSubjects={addSubjectsToSemester}
+          onUpdateDates={updateSemesterDates}
         />
       )}
       {modal === "task"     && <AddTaskModal onClose={() => setModal(null)} onAdd={addTask} defaultType="homework" subjects={subjects} />}

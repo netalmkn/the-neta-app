@@ -14,6 +14,7 @@ export interface Task {
   semester_id?: string | null;
   total_questions?: number | null;
   completed_questions?: number | null;
+  grade?: string | null;
   created_at?: string;
 }
 
@@ -42,6 +43,8 @@ export interface Semester {
   name: string;
   year: number;
   semester: number;
+  start_date?: string | null;
+  end_date?: string | null;
   created_at?: string;
 }
 

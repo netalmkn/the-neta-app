@@ -130,8 +130,10 @@ function AddExamModal({ onClose, onAdd, subjects }: {
   );
 }
 
-function ExamRow({ task, onToggle, onDelete, subjects }: { task: Task; onToggle: (id: string) => void; onDelete: (id: string) => void; subjects: SemesterSubject[] }) {
+function ExamRow({ task, onToggle, onDelete, subjects, onUpdateGrade }: { task: Task; onToggle: (id: string) => void; onDelete: (id: string) => void; subjects: SemesterSubject[]; onUpdateGrade?: (id: string, grade: string) => void }) {
   const [hov, setHov] = useState(false);
+  const [editingGrade, setEditingGrade] = useState(false);
+  const [gradeInput, setGradeInput] = useState(task.grade ?? "");
   const subColor = subjects.find((s) => s.name === task.subject)?.color;
 
   // Days until exam
@@ -176,6 +178,32 @@ function ExamRow({ task, onToggle, onDelete, subjects }: { task: Task; onToggle:
           <span className="text-[11px] hidden sm:flex items-center gap-1" style={{ color: N.muted }}>
             <Ico.clock />{task.deadline}
           </span>
+        )}
+        {task.done && onUpdateGrade && (
+          editingGrade ? (
+            <input
+              autoFocus
+              type="text"
+              placeholder="e.g. 85, A+"
+              value={gradeInput}
+              onChange={(e) => setGradeInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { onUpdateGrade(task.id, gradeInput); setEditingGrade(false); }
+                if (e.key === "Escape") setEditingGrade(false);
+              }}
+              onBlur={() => { onUpdateGrade(task.id, gradeInput); setEditingGrade(false); }}
+              className="w-20 px-2 py-0.5 rounded-lg text-[12px] outline-none text-center"
+              style={{ background: N.hover, border: `1px solid ${N.accent}`, color: N.text }}
+            />
+          ) : (
+            <button onClick={() => setEditingGrade(true)}
+              className="text-[12px] font-semibold px-2.5 py-0.5 rounded-lg transition-colors"
+              style={task.grade
+                ? { background: "#DCFCE7", color: "#166534" }
+                : { background: N.hover, color: N.muted }}>
+              {task.grade ? task.grade : "+ Grade"}
+            </button>
+          )
         )}
         {hov && <button onClick={() => onDelete(task.id)} className="transition-colors" style={{ color: N.border }} onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")} onMouseLeave={(e) => (e.currentTarget.style.color = N.border)}><Ico.trash /></button>}
       </div>
@@ -237,6 +265,11 @@ export default function ExamsPage() {
     await supabase.from("tasks").delete().eq("id", id);
   };
 
+  const updateGrade = async (id: string, grade: string) => {
+    setTasks((p) => p.map((t) => t.id === id ? { ...t, grade: grade || null } : t));
+    await supabase.from("tasks").update({ grade: grade || null }).eq("id", id);
+  };
+
   const filtered = useMemo(() => filterSubject ? tasks.filter((t) => t.subject === filterSubject) : tasks, [tasks, filterSubject]);
   const undone = useMemo(() => filtered.filter((t) => !t.done), [filtered]);
   const done   = useMemo(() => filtered.filter((t) =>  t.done), [filtered]);
@@ -296,7 +329,7 @@ export default function ExamsPage() {
             </div>
             {loading ? [1,2,3].map((i) => <div key={i} className="h-14 rounded-2xl animate-pulse mb-2" style={{ background: N.hover }} />) :
               undone.length === 0 ? <p className="text-[13px] py-6 text-center rounded-2xl" style={{ color: N.muted, background: N.hover }}>No upcoming exams</p> :
-              <div className="space-y-2">{undone.map((t) => <ExamRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} subjects={subjects} />)}</div>
+              <div className="space-y-2">{undone.map((t) => <ExamRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} subjects={subjects} onUpdateGrade={updateGrade} />)}</div>
             }
           </div>
 
@@ -306,7 +339,7 @@ export default function ExamsPage() {
                 <span style={{ transform: showDone ? "rotate(90deg)" : "none", transition: "transform 0.15s", display: "inline-block" }}><Ico.chevR /></span>
                 {done.length} passed
               </button>
-              {showDone && <div className="space-y-2 opacity-70">{done.map((t) => <ExamRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} subjects={subjects} />)}</div>}
+              {showDone && <div className="space-y-2 opacity-70">{done.map((t) => <ExamRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} subjects={subjects} onUpdateGrade={updateGrade} />)}</div>}
             </div>
           )}
         </div>
