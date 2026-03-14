@@ -255,7 +255,7 @@ export default function HomeworkPage() {
               <h1 className="text-[24px] font-bold" style={{ color: N.text }}>Homework</h1>
               {activeSemName && <p className="text-[13px] mt-0.5" style={{ color: N.muted }}>{activeSemName}</p>}
             </div>
-            <button onClick={() => setModal(true)} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-semibold transition-all active:scale-95" style={{ background: N.accent, color: "white", boxShadow: "0 2px 8px rgba(99,102,241,0.3)" }}><Ico.plus /> New assignment</button>
+            <button onClick={() => setModal(true)} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-semibold transition-all active:scale-95" style={{ background: N.accent, color: "white", boxShadow: "0 2px 8px rgba(60,150,217,0.35)" }}><Ico.plus /> New assignment</button>
           </div>
 
           {subjects.length > 0 && (

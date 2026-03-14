@@ -2,7 +2,7 @@
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type EventType = "homework" | "exam" | "personal" | "project" | "school";
+export type EventType = "homework" | "exam" | "personal" | "project" | "school" | "class" | "errands" | "workout";
 
 export interface Task {
   id: string;
@@ -73,26 +73,29 @@ export function formatTime(t: string) {
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 export const N = {
-  bg:       "#FAFAF9",
-  sidebar:  "#F5F2EC",
-  text:     "#1C1C1E",
-  muted:    "#9B9894",
-  border:   "#E8E4DA",
-  hover:    "#F0EDE5",
-  active:   "#E8E2D8",
-  selected: "#EEF2FF",
-  accent:   "#6366F1",
-  accentBg: "#EEF2FF",
+  bg:       "#EFF7FF",
+  sidebar:  "#E1F0FC",
+  text:     "#1B2E45",
+  muted:    "#6A8FAD",
+  border:   "#BAD4E8",
+  hover:    "#D5E9F8",
+  active:   "#BDD9F4",
+  selected: "#A5CCEE",
+  accent:   "#3C96D9",
+  accentBg: "#E5F3FF",
 };
 
 // ─── Type config ──────────────────────────────────────────────────────────────
 
 export const TYPES: Record<EventType, { label: string; bg: string; text: string; accent: string }> = {
   homework: { label: "Homework", bg: "#EFF6FF", text: "#1D4ED8", accent: "#3B82F6" },
-  exam:     { label: "Exam",     bg: "#FFF7ED", text: "#C2410C", accent: "#F97316" },
-  personal: { label: "Personal", bg: "#F0FDF4", text: "#166534", accent: "#22C55E" },
+  exam:     { label: "Exam",     bg: "#FFF0F0", text: "#B91C1C", accent: "#F87171" },
+  personal: { label: "Personal", bg: "#F0FDF4", text: "#15803D", accent: "#22C55E" },
   project:  { label: "Project",  bg: "#F5F3FF", text: "#6D28D9", accent: "#8B5CF6" },
-  school:   { label: "School",   bg: "#FFF0FA", text: "#BE185D", accent: "#EC4899" },
+  school:   { label: "School",   bg: "#F0F9FF", text: "#0369A1", accent: "#0EA5E9" },
+  class:    { label: "Class",    bg: "#EFF6FF", text: "#1E40AF", accent: "#60A5FA" },
+  errands:  { label: "Errands",  bg: "#FFF7ED", text: "#C2410C", accent: "#F97316" },
+  workout:  { label: "Workout",  bg: "#F0FDF4", text: "#166534", accent: "#4ADE80" },
 };
 
 export const SUBJECT_COLORS = [
@@ -277,15 +280,16 @@ export function SidebarNav({
           const active = pathname === href;
           return (
             <Link key={href} href={href} onClick={onClose}
-              className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] transition-colors"
+              className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-[13px] transition-all"
               style={{
-                background: active ? N.selected : "transparent",
-                color: active ? N.accent : N.muted,
+                background: active ? N.accent : "transparent",
+                color: active ? "white" : N.muted,
                 fontWeight: active ? 600 : 400,
+                boxShadow: active ? `0 2px 8px ${N.accent}40` : "none",
               }}
               onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = N.hover; }}
               onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}>
-              <span style={{ color: active ? N.accent : N.muted }}><IconComp /></span>
+              <span style={{ color: active ? "white" : N.muted }}><IconComp /></span>
               {label}
             </Link>
           );
