@@ -332,7 +332,8 @@ export default function TasksPage() {
   };
 
   const addTask = async (task: Omit<Task, "id" | "done" | "created_at">) => {
-    const { data } = await supabase.from("tasks").insert({ ...task, done: false, semester_id: activeSemesterId }).select().single();
+    const { data, error } = await supabase.from("tasks").insert({ ...task, done: false, semester_id: activeSemesterId }).select().single();
+    if (error) { alert(`Failed to save: ${error.message}`); return; }
     if (data) setTasks((p) => [...p, data as Task]);
     setModal(false);
   };
