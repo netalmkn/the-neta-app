@@ -564,14 +564,17 @@ function CreateSemesterModal({ onClose, onCreate }: {
 
 // ─── Edit Semester Modal ──────────────────────────────────────────────────────
 
-function EditSemesterModal({ semesterName, activeSemester, existingSubjects, onClose, onAddSubjects, onUpdateDates }: {
+function EditSemesterModal({ semesterName, activeSemester, existingSubjects, onClose, onAddSubjects, onUpdateDates, onUpdateSubject, onDeleteSubject }: {
   semesterName: string;
   activeSemester: Semester;
   existingSubjects: SemesterSubject[];
   onClose: () => void;
   onAddSubjects: (subjects: { name: string; credits: number; color: string }[]) => Promise<void>;
   onUpdateDates: (startDate: string, endDate: string) => Promise<void>;
+  onUpdateSubject: (id: string, name: string, credits: number, color: string) => Promise<void>;
+  onDeleteSubject: (id: string) => Promise<void>;
 }) {
+  const [editSubjects, setEditSubjects] = useState(existingSubjects.map((s) => ({ ...s })));
   const [newSubjects, setNewSubjects] = useState([
     { name: "", credits: 4, color: SUBJECT_COLORS[existingSubjects.length % SUBJECT_COLORS.length] },
   ]);
@@ -579,6 +582,16 @@ function EditSemesterModal({ semesterName, activeSemester, existingSubjects, onC
   const [endDate, setEndDate] = useState(activeSemester.end_date ?? "");
   const [savingDates, setSavingDates] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingSubjectId, setSavingSubjectId] = useState<string | null>(null);
+
+  const updateEdit = (id: string, field: string, value: string | number) =>
+    setEditSubjects((p) => p.map((s) => s.id === id ? { ...s, [field]: value } : s));
+
+  const saveSubject = async (s: typeof editSubjects[0]) => {
+    setSavingSubjectId(s.id);
+    await onUpdateSubject(s.id, s.name, s.credits, s.color);
+    setSavingSubjectId(null);
+  };
 
   const update = (i: number, field: string, value: string | number) =>
     setNewSubjects((p) => p.map((s, idx) => idx === i ? { ...s, [field]: value } : s));
@@ -622,17 +635,32 @@ function EditSemesterModal({ semesterName, activeSemester, existingSubjects, onC
             </button>
           </div>
 
-          {/* Existing subjects — read-only */}
-          {existingSubjects.length > 0 && (
+          {/* Existing subjects — editable */}
+          {editSubjects.length > 0 && (
             <div className="mb-5">
               <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: N.muted }}>Current Courses</p>
-              <div className="space-y-1.5">
-                {existingSubjects.map((s) => (
-                  <div key={s.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg"
-                    style={{ background: N.hover }}>
-                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                    <span className="text-[13px] flex-1" style={{ color: N.text }}>{s.name}</span>
-                    <span className="text-[11px]" style={{ color: N.muted }}>{s.credits} cr</span>
+              <div className="space-y-2">
+                {editSubjects.map((s) => (
+                  <div key={s.id} className="flex items-center gap-2">
+                    <ColorPicker value={s.color} onChange={(c) => updateEdit(s.id, "color", c)} />
+                    <input type="text" value={s.name} onChange={(e) => updateEdit(s.id, "name", e.target.value)}
+                      className="flex-1 px-3 py-1.5 rounded-lg text-[13px] outline-none"
+                      style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
+                    <input type="number" min="1" max="20" value={s.credits}
+                      onChange={(e) => updateEdit(s.id, "credits", Number(e.target.value))}
+                      className="w-12 px-2 py-1.5 rounded-lg text-[12px] text-center outline-none"
+                      style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
+                    <span className="text-[10px]" style={{ color: N.muted }}>cr</span>
+                    <button onClick={() => saveSubject(s)} disabled={savingSubjectId === s.id}
+                      className="text-[11px] font-semibold px-2 py-1 rounded-lg transition-colors disabled:opacity-50"
+                      style={{ background: N.accentBg, color: N.accent }}>
+                      {savingSubjectId === s.id ? "…" : "Save"}
+                    </button>
+                    <button onClick={() => onDeleteSubject(s.id)} className="transition-colors" style={{ color: N.muted }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = N.muted)}>
+                      <Ico.trash />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1319,6 +1347,16 @@ export default function Home() {
     setModal(null);
   };
 
+  const updateSubject = async (id: string, name: string, credits: number, color: string) => {
+    await supabase.from("semester_subjects").update({ name, credits, color }).eq("id", id);
+    setSubjects((p) => p.map((s) => s.id === id ? { ...s, name, credits, color } : s));
+  };
+
+  const deleteSubject = async (id: string) => {
+    await supabase.from("semester_subjects").delete().eq("id", id);
+    setSubjects((p) => p.filter((s) => s.id !== id));
+  };
+
   const deleteSemester = async (id: string) => {
     await supabase.from("semesters").delete().eq("id", id);
     setSemesters((p) => {
@@ -1844,6 +1882,8 @@ export default function Home() {
           onClose={() => setModal(null)}
           onAddSubjects={addSubjectsToSemester}
           onUpdateDates={updateSemesterDates}
+          onUpdateSubject={updateSubject}
+          onDeleteSubject={deleteSubject}
         />
       )}
       {modal === "task"     && <AddTaskModal onClose={() => setModal(null)} onAdd={addTask} defaultType="homework" subjects={subjects} />}

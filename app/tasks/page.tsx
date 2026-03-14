@@ -220,16 +220,17 @@ function TaskRow({ task, onToggle, onDelete, onEdit, subjects }: {
   task: Task; onToggle: (id: string) => void; onDelete: (id: string) => void;
   onEdit: (task: Task) => void; subjects: SemesterSubject[];
 }) {
-  const [hov, setHov] = useState(false);
   const t = TYPES[task.type] ?? TYPES.personal;
   const subColor = subjects.find((s) => s.name === task.subject)?.color;
 
   return (
-    <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-      className="px-3 py-2.5 rounded-xl transition-colors border"
-      style={{ background: hov ? N.hover : N.bg, borderColor: N.border }}>
+    <div onClick={() => onEdit(task)}
+      className="px-3 py-2.5 rounded-xl transition-colors border cursor-pointer"
+      style={{ background: N.bg, borderColor: N.border }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = N.hover)}
+      onMouseLeave={(e) => (e.currentTarget.style.background = N.bg)}>
       <div className="flex items-center gap-2.5">
-        <button onClick={() => onToggle(task.id)}
+        <button onClick={(e) => { e.stopPropagation(); onToggle(task.id); }}
           className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-all"
           style={task.done ? { background: N.muted, borderColor: N.muted } : { background: "transparent", borderColor: N.border }}>
           {task.done && <Ico.check />}
@@ -252,20 +253,12 @@ function TaskRow({ task, onToggle, onDelete, onEdit, subjects }: {
               <Ico.clock />{task.deadline}
             </span>
           )}
-          {hov && (
-            <>
-              <button onClick={() => onEdit(task)} className="transition-colors" style={{ color: N.muted }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = N.accent)}
-                onMouseLeave={(e) => (e.currentTarget.style.color = N.muted)}>
-                <Ico.edit />
-              </button>
-              <button onClick={() => onDelete(task.id)} className="transition-colors" style={{ color: N.border }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")}
-                onMouseLeave={(e) => (e.currentTarget.style.color = N.border)}>
-                <Ico.trash />
-              </button>
-            </>
-          )}
+          <button onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
+            className="transition-colors p-1" style={{ color: N.border }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = N.border)}>
+            <Ico.trash />
+          </button>
         </div>
       </div>
     </div>
