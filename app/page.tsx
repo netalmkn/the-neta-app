@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type EventType = "homework" | "exam" | "personal" | "project";
+type EventType = "homework" | "exam" | "personal" | "project" | "school";
 
 interface Task {
   id: string;
@@ -101,16 +101,16 @@ const MON3 = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov",
 // ─── Notion design tokens ─────────────────────────────────────────────────────
 
 const N = {
-  bg:        "#FFFFFF",
-  sidebar:   "#F7F6F3",
-  text:      "#37352F",
-  muted:     "#787774",
-  border:    "#E3E2E0",
-  hover:     "#F1F1EF",
-  active:    "#EBEBEA",
-  selected:  "#E8EEFD",
-  accent:    "#2383E2",
-  accentBg:  "#E8F1FB",
+  bg:        "#FAFAF9",
+  sidebar:   "#F5F2EC",
+  text:      "#1C1C1E",
+  muted:     "#9B9894",
+  border:    "#E8E4DA",
+  hover:     "#F0EDE5",
+  active:    "#E8E2D8",
+  selected:  "#EEF2FF",
+  accent:    "#6366F1",
+  accentBg:  "#EEF2FF",
 };
 
 // ─── Type config ──────────────────────────────────────────────────────────────
@@ -120,12 +120,44 @@ const TYPES: Record<EventType, { label: string; bg: string; text: string; accent
   exam:     { label: "Exam",     bg: "#FFF7ED", text: "#C2410C", accent: "#F97316" },
   personal: { label: "Personal", bg: "#F0FDF4", text: "#166534", accent: "#22C55E" },
   project:  { label: "Project",  bg: "#F5F3FF", text: "#6D28D9", accent: "#8B5CF6" },
+  school:   { label: "School",   bg: "#FFF0FA", text: "#BE185D", accent: "#EC4899" },
 };
 
 const SUBJECT_COLORS = [
-  "#93C5FD","#C4B5FD","#86EFAC","#FCA5A5","#FDE68A",
-  "#A5F3FC","#FBCFE8","#D9F99D","#FED7AA","#E9D5FF",
+  "#93C5FD","#BAE6FD","#A5F3FC","#6EE7B7","#86EFAC",
+  "#D9F99D","#FDE68A","#FCA5A5","#FBCFE8","#C4B5FD",
+  "#DDD6FE","#E9D5FF","#FED7AA","#FECACA","#A7F3D0",
+  "#BFDBFE","#F9A8D4","#BBF7D0","#F0ABFC","#FEF08A",
 ];
+
+function ColorPicker({ value, onChange }: { value: string; onChange: (c: string) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative flex-shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-7 h-7 rounded-full border-2 transition-all"
+        style={{ background: value, borderColor: open ? N.accent : "transparent", boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }}
+      />
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-9 z-50 p-2 rounded-xl"
+            style={{ background: N.bg, border: `1px solid ${N.border}`, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", width: 172 }}>
+            <div className="grid grid-cols-5 gap-1.5">
+              {SUBJECT_COLORS.map((c) => (
+                <button key={c} type="button" onClick={() => { onChange(c); setOpen(false); }}
+                  className="w-7 h-7 rounded-full transition-transform hover:scale-110"
+                  style={{ background: c, outline: value === c ? `2px solid ${N.accent}` : "2px solid transparent", outlineOffset: 2 }} />
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 // ─── Notion-style primitives ──────────────────────────────────────────────────
 
@@ -265,10 +297,11 @@ function SemesterPicker({ semesters, activeSemesterId, onSwitch, onCreate, onDel
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
-  { href: "/",         label: "Dashboard", emoji: "🏠" },
-  { href: "/tasks",    label: "Tasks",     emoji: "✅" },
-  { href: "/homework", label: "Homework",  emoji: "📖" },
-  { href: "/exams",    label: "Exams",     emoji: "📝" },
+  { href: "/",          label: "Dashboard", emoji: "🏠" },
+  { href: "/tasks",     label: "Tasks",     emoji: "✅" },
+  { href: "/homework",  label: "Homework",  emoji: "📖" },
+  { href: "/exams",     label: "Exams",     emoji: "📝" },
+  { href: "/calendar",  label: "Calendar",  emoji: "🗓" },
 ] as const;
 
 function SidebarContent({ semesters, activeSemesterId, onSwitchSemester, onCreateSemester, onDeleteSemester, onClose }: {
@@ -407,13 +440,7 @@ function CreateSemesterModal({ onClose, onCreate }: {
           <div className="space-y-2 mb-3">
             {subjects.map((s, i) => (
               <div key={i} className="flex items-center gap-2">
-                <div className="relative flex-shrink-0">
-                  <div className="w-6 h-6 rounded-full" style={{ background: s.color }} />
-                  <select value={s.color} onChange={(e) => update(i, "color", e.target.value)}
-                    className="absolute inset-0 opacity-0 w-full cursor-pointer">
-                    {SUBJECT_COLORS.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
+                <ColorPicker value={s.color} onChange={(c) => update(i, "color", c)} />
                 <input type="text" placeholder={`Course ${i + 1}`} value={s.name}
                   onChange={(e) => update(i, "name", e.target.value)}
                   className="flex-1 px-3 py-1.5 rounded-lg text-[13px] outline-none"
@@ -1148,18 +1175,18 @@ export default function Home() {
             </p>
           </div>
 
-          {/* ── Property row (Notion-style inline stats) ── */}
-          <div className="mb-6 py-3 grid grid-cols-2 sm:grid-cols-4 gap-0"
-            style={{ borderTop: `1px solid ${N.border}`, borderBottom: `1px solid ${N.border}` }}>
+          {/* ── Stat cards ── */}
+          <div className="mb-7 grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: "Tasks left",     value: undoneTasks.length },
-              { label: "Done this week", value: tasksDoneThisWeek },
-              { label: "Upcoming exams", value: exams.length },
-              { label: "Day streak",     value: streak ? `${streak} 🔥` : "0" },
-            ].map((s, i) => (
-              <div key={s.label} className="px-3 py-1" style={{ borderLeft: i > 0 ? `1px solid ${N.border}` : "none" }}>
-                <p className="text-[10px] font-semibold uppercase tracking-widest mb-0.5" style={{ color: N.muted }}>{s.label}</p>
-                <p className="text-[20px] font-bold" style={{ color: N.text }}>{s.value}</p>
+              { label: "Tasks left",     value: undoneTasks.length, bg: "#EEF2FF", num: "#6366F1" },
+              { label: "Done this week", value: tasksDoneThisWeek,  bg: "#F0FDF4", num: "#16A34A" },
+              { label: "Upcoming exams", value: exams.length,       bg: "#FFF7ED", num: "#EA580C" },
+              { label: "Day streak",     value: streak ? `${streak} 🔥` : "0", bg: "#FDF4FF", num: "#9333EA" },
+            ].map((s) => (
+              <div key={s.label} className="rounded-2xl px-4 py-3.5"
+                style={{ background: s.bg, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+                <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>{s.label}</p>
+                <p className="text-[26px] font-bold leading-none" style={{ color: s.num }}>{s.value}</p>
               </div>
             ))}
           </div>
