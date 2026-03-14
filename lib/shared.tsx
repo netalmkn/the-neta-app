@@ -52,7 +52,7 @@ export interface SemesterSubject {
   id: string;
   semester_id: string;
   name: string;
-  target_hours: number;
+  credits: number;
   color: string;
   created_at?: string;
 }
