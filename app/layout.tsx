@@ -19,16 +19,14 @@ export const metadata: Metadata = {
   description: "Your daily study planner",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className={`${jakarta.variable} antialiased`}>
-        <main className="pb-20">{children}</main>
-        <BottomNav />
+        {children}
+        <div className="lg:hidden">
+          <BottomNav />
+        </div>
       </body>
     </html>
   );
