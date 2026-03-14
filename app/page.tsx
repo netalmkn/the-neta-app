@@ -32,7 +32,7 @@ interface CalendarEvent {
 
 interface StudyLog {
   id: string;
-  subject: string;
+  subject_id: string | null;
   hours: number;
   date: string;
   semester_id?: string | null;
@@ -51,7 +51,7 @@ interface SemesterSubject {
   id: string;
   semester_id: string;
   name: string;
-  target_hours: number;
+  credits: number;
   color: string;
   created_at?: string;
 }
@@ -386,14 +386,14 @@ function SidebarContent({ semesters, activeSemesterId, onSwitchSemester, onCreat
 
 function CreateSemesterModal({ onClose, onCreate }: {
   onClose: () => void;
-  onCreate: (name: string, year: number, semester: number, subjects: { name: string; target_hours: number; color: string }[]) => Promise<void>;
+  onCreate: (name: string, year: number, semester: number, subjects: { name: string; credits: number; color: string }[]) => Promise<void>;
 }) {
   const [year, setYear] = useState(1);
   const [sem, setSem] = useState(1);
   const [subjects, setSubjects] = useState([
-    { name: "", target_hours: 4, color: SUBJECT_COLORS[0] },
-    { name: "", target_hours: 4, color: SUBJECT_COLORS[1] },
-    { name: "", target_hours: 4, color: SUBJECT_COLORS[2] },
+    { name: "", credits: 4, color: SUBJECT_COLORS[0] },
+    { name: "", credits: 4, color: SUBJECT_COLORS[1] },
+    { name: "", credits: 4, color: SUBJECT_COLORS[2] },
   ]);
   const [saving, setSaving] = useState(false);
 
@@ -451,8 +451,8 @@ function CreateSemesterModal({ onClose, onCreate }: {
                   onChange={(e) => update(i, "name", e.target.value)}
                   className="flex-1 px-3 py-1.5 rounded-lg text-[13px] outline-none"
                   style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
-                <input type="number" min="1" max="20" value={s.target_hours}
-                  onChange={(e) => update(i, "target_hours", Number(e.target.value))}
+                <input type="number" min="1" max="20" value={s.credits}
+                  onChange={(e) => update(i, "credits", Number(e.target.value))}
                   className="w-12 px-2 py-1.5 rounded-lg text-[12px] text-center outline-none"
                   style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
                 <span className="text-[10px]" style={{ color: N.muted }}>cr</span>
@@ -465,7 +465,7 @@ function CreateSemesterModal({ onClose, onCreate }: {
               </div>
             ))}
           </div>
-          <button onClick={() => setSubjects((p) => [...p, { name: "", target_hours: 4, color: SUBJECT_COLORS[p.length % SUBJECT_COLORS.length] }])}
+          <button onClick={() => setSubjects((p) => [...p, { name: "", credits: 4, color: SUBJECT_COLORS[p.length % SUBJECT_COLORS.length] }])}
             className="w-full py-1.5 rounded-lg text-[12px] mb-5 transition-colors border-dashed border"
             style={{ borderColor: N.border, color: N.muted }}
             onMouseEnter={(e) => (e.currentTarget.style.background = N.hover)}
@@ -556,18 +556,18 @@ function PomodoroTimer() {
 function LogStudyModal({ subjects, onClose, onLog }: {
   subjects: SemesterSubject[];
   onClose: () => void;
-  onLog: (subject: string, hours: number, date: string) => Promise<void>;
+  onLog: (subjectId: string, hours: number, date: string) => Promise<void>;
 }) {
-  const [subject, setSubject] = useState(subjects[0]?.name ?? "");
+  const [subjectId, setSubjectId] = useState(subjects[0]?.id ?? "");
   const [hours, setHours] = useState("1");
   const [date, setDate] = useState(toDateStr(new Date()));
   const [saving, setSaving] = useState(false);
 
   const handleLog = async () => {
     const h = parseFloat(hours);
-    if (!subject || !h || h <= 0) return;
+    if (!subjectId || !h || h <= 0) return;
     setSaving(true);
-    await onLog(subject, h, date);
+    await onLog(subjectId, h, date);
     setSaving(false);
   };
 
@@ -601,26 +601,25 @@ function LogStudyModal({ subjects, onClose, onLog }: {
               <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: N.muted }}>Course</p>
               <div className="space-y-1">
                 {subjects.map((s) => (
-                  <button key={s.id} onClick={() => setSubject(s.name)}
+                  <button key={s.id} onClick={() => setSubjectId(s.id)}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-left transition-colors"
-                    style={{ background: subject === s.name ? N.selected : "transparent", color: N.text }}
-                    onMouseEnter={(e) => { if (subject !== s.name) e.currentTarget.style.background = N.hover; }}
-                    onMouseLeave={(e) => { if (subject !== s.name) e.currentTarget.style.background = "transparent"; }}>
+                    style={{ background: subjectId === s.id ? N.selected : "transparent", color: N.text }}
+                    onMouseEnter={(e) => { if (subjectId !== s.id) e.currentTarget.style.background = N.hover; }}
+                    onMouseLeave={(e) => { if (subjectId !== s.id) e.currentTarget.style.background = "transparent"; }}>
                     <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
                     {s.name}
-                    <span className="ml-auto text-[11px]" style={{ color: N.muted }}>goal: {s.target_hours}cr/wk</span>
                   </button>
                 ))}
               </div>
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: N.muted }}>Credits studied</p>
+              <p className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: N.muted }}>Hours studied</p>
               <div className="flex gap-1.5 mb-2">
                 {[0.5,1,1.5,2,3].map((h) => (
                   <button key={h} onClick={() => setHours(String(h))}
                     className="flex-1 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
                     style={{ background: hours === String(h) ? N.text : N.hover, color: hours === String(h) ? "white" : N.muted }}>
-                    {h}cr
+                    {h}h
                   </button>
                 ))}
               </div>
@@ -635,7 +634,7 @@ function LogStudyModal({ subjects, onClose, onLog }: {
                 className="w-full px-3 py-1.5 rounded-lg text-[13px] outline-none"
                 style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
             </div>
-            <button onClick={handleLog} disabled={saving || !subject || parseFloat(hours) <= 0}
+            <button onClick={handleLog} disabled={saving || !subjectId || parseFloat(hours) <= 0}
               className="w-full py-2.5 rounded-lg text-[13px] font-semibold transition-colors disabled:opacity-40"
               style={{ background: N.text, color: "white" }}>
               {saving ? "Saving…" : "Log Session"}
@@ -775,7 +774,7 @@ function WeeklyBarChart({ studyLogs }: { studyLogs: StudyLog[] }) {
     <div>
       <div className="flex items-end justify-between mb-1">
         <span className="text-[12px]" style={{ color: N.muted }}>Weekly activity</span>
-        <span className="text-[12px] font-semibold" style={{ color: N.text }}>{totalCr.toFixed(1)}cr</span>
+        <span className="text-[12px] font-semibold" style={{ color: N.text }}>{totalCr.toFixed(1)}h</span>
       </div>
       <div className="flex items-end gap-1.5" style={{ height: 48 }}>
         {days.map((d, i) => {
@@ -1037,7 +1036,7 @@ export default function Home() {
 
   const switchSemester = (id: string) => { setActiveSemesterId(id); setTasks([]); setStudyLogs([]); };
 
-  const createSemester = async (name: string, year: number, semester: number, newSubjects: { name: string; target_hours: number; color: string }[]) => {
+  const createSemester = async (name: string, year: number, semester: number, newSubjects: { name: string; credits: number; color: string }[]) => {
     const { data: semData } = await supabase.from("semesters").insert({ name, year, semester }).select().single();
     if (!semData) return;
     const sem = semData as Semester;
@@ -1094,8 +1093,8 @@ export default function Home() {
     await supabase.from("calendar_entries").delete().eq("id", id);
   };
 
-  const addStudyLog = async (subject: string, hours: number, date: string) => {
-    const { data } = await supabase.from("study_logs").insert({ subject, hours, date, semester_id: activeSemesterId }).select().single();
+  const addStudyLog = async (subjectId: string, hours: number, date: string) => {
+    const { data } = await supabase.from("study_logs").insert({ subject_id: subjectId, hours, date, semester_id: activeSemesterId }).select().single();
     if (data) setStudyLogs((p) => [data as StudyLog, ...p]);
     setModal(null);
   };
@@ -1127,8 +1126,9 @@ export default function Home() {
     const sun = new Date(mon); sun.setDate(mon.getDate() + 6); sun.setHours(23, 59, 59, 999);
     const map: Record<string, number> = {};
     studyLogs.forEach((l) => {
+      if (!l.subject_id) return;
       const d = new Date(l.date + "T12:00:00");
-      if (d >= mon && d <= sun) map[l.subject] = (map[l.subject] ?? 0) + l.hours;
+      if (d >= mon && d <= sun) map[l.subject_id] = (map[l.subject_id] ?? 0) + l.hours;
     });
     return map;
   }, [studyLogs]);
@@ -1142,8 +1142,7 @@ export default function Home() {
   }, [studyLogs]);
 
   const activeSemesterName = semesters.find((s) => s.id === activeSemesterId)?.name;
-  const totalCrThisWeek = Object.values(weeklyHours).reduce((a, b) => a + b, 0);
-  const totalTarget = subjects.reduce((sum, s) => sum + s.target_hours, 0);
+  const totalHrsThisWeek = Object.values(weeklyHours).reduce((a, b) => a + b, 0);
 
   const [selY, selM, selD] = selectedDate.split("-").map(Number);
   const selObj = new Date(selY, selM - 1, selD);
@@ -1393,18 +1392,13 @@ export default function Home() {
               ) : (
                 <div className="space-y-2.5">
                   {subjects.map((s) => {
-                    const logged = weeklyHours[s.name] ?? 0;
-                    const pct = Math.min((logged / s.target_hours) * 100, 100);
+                    const logged = weeklyHours[s.id] ?? 0;
                     return (
                       <div key={s.id} className="flex items-center gap-3">
                         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                        <span className="text-[13px] w-40 truncate flex-shrink-0" style={{ color: N.text }}>{s.name}</span>
-                        <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: N.border }}>
-                          <div className="h-full rounded-full transition-all duration-500"
-                            style={{ width: `${pct}%`, background: s.color }} />
-                        </div>
-                        <span className="text-[11px] tabular-nums w-16 text-right flex-shrink-0" style={{ color: N.muted }}>
-                          {logged}cr / {s.target_hours}cr
+                        <span className="text-[13px] flex-1 truncate" style={{ color: N.text }}>{s.name}</span>
+                        <span className="text-[12px] tabular-nums flex-shrink-0 font-medium" style={{ color: logged > 0 ? N.text : N.muted }}>
+                          {logged > 0 ? `${logged.toFixed(1)}h this week` : "—"}
                         </span>
                       </div>
                     );
@@ -1412,7 +1406,7 @@ export default function Home() {
                   <div className="flex items-center justify-between pt-1 mt-1" style={{ borderTop: `1px solid ${N.border}` }}>
                     <span className="text-[12px]" style={{ color: N.muted }}>Weekly total</span>
                     <span className="text-[13px] font-semibold" style={{ color: N.text }}>
-                      {totalCrThisWeek.toFixed(1)}cr{totalTarget > 0 && ` / ${totalTarget}cr`}
+                      {totalHrsThisWeek.toFixed(1)}h studied
                     </span>
                   </div>
                 </div>

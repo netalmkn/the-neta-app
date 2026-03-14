@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type EventType = "homework" | "exam" | "personal" | "project" | "school";
+type Recurrence = "none" | "daily" | "weekly" | "monthly";
 
 interface CalendarEvent {
   id: string;
@@ -15,6 +16,8 @@ interface CalendarEvent {
   end_time: string;
   all_day?: boolean | null;
   type: EventType;
+  recurrence?: Recurrence | null;
+  recurrence_end?: string | null;
   created_at?: string;
 }
 
@@ -62,6 +65,132 @@ const TYPES: Record<EventType, { label: string; bg: string; text: string; accent
   school:   { label: "School",   bg: "#FFF0FA", text: "#BE185D", accent: "#EC4899" },
 };
 
+const RECURRENCE_OPTIONS: { value: Recurrence; label: string }[] = [
+  { value: "none",    label: "Does not repeat" },
+  { value: "daily",   label: "Every day" },
+  { value: "weekly",  label: "Every week" },
+  { value: "monthly", label: "Every month" },
+];
+
+// ─── Event Form Fields (shared by Add + Edit modals) ──────────────────────────
+
+function EventForm({
+  title, setTitle,
+  type, setType,
+  eventDate, setEventDate,
+  allDay, setAllDay,
+  startTime, setStartTime,
+  endTime, setEndTime,
+  recurrence, setRecurrence,
+  recurrenceEnd, setRecurrenceEnd,
+  saving, onSubmit, submitLabel,
+}: {
+  title: string; setTitle: (v: string) => void;
+  type: EventType; setType: (v: EventType) => void;
+  eventDate: string; setEventDate: (v: string) => void;
+  allDay: boolean; setAllDay: (v: boolean) => void;
+  startTime: string; setStartTime: (v: string) => void;
+  endTime: string; setEndTime: (v: string) => void;
+  recurrence: Recurrence; setRecurrence: (v: Recurrence) => void;
+  recurrenceEnd: string; setRecurrenceEnd: (v: string) => void;
+  saving: boolean; onSubmit: () => void; submitLabel: string;
+}) {
+  return (
+    <div className="space-y-3">
+      <input autoFocus type="text" placeholder="Event title" value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && onSubmit()}
+        className="w-full px-3 py-2 rounded-xl text-[14px] outline-none"
+        style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
+
+      {/* Date */}
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>Date</p>
+        <input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)}
+          className="w-full px-3 py-1.5 rounded-xl text-[13px] outline-none"
+          style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
+      </div>
+
+      {/* All-day toggle */}
+      <button onClick={() => setAllDay(!allDay)}
+        className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl transition-colors text-[13px]"
+        style={{ background: allDay ? N.selected : N.hover, color: N.text }}>
+        <div className="w-8 h-5 rounded-full relative transition-colors flex-shrink-0"
+          style={{ background: allDay ? N.accent : N.border }}>
+          <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
+            style={{ left: allDay ? "calc(100% - 18px)" : 2 }} />
+        </div>
+        All day
+      </button>
+
+      {/* Type */}
+      <div className="flex flex-wrap gap-1.5">
+        {(Object.keys(TYPES) as EventType[]).map((k) => (
+          <button key={k} onClick={() => setType(k)}
+            className="px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors"
+            style={{
+              background: type === k ? TYPES[k].bg : N.hover,
+              color: type === k ? TYPES[k].text : N.muted,
+              border: type === k ? `1.5px solid ${TYPES[k].accent}` : "1.5px solid transparent",
+            }}>
+            {TYPES[k].label}
+          </button>
+        ))}
+      </div>
+
+      {/* Times — hidden when all day */}
+      {!allDay && (
+        <div className="grid grid-cols-2 gap-2">
+          {([["Start", startTime, setStartTime], ["End", endTime, setEndTime]] as const).map(([lbl, val, set]) => (
+            <div key={lbl}>
+              <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: N.muted }}>{lbl}</p>
+              <select value={val} onChange={(e) => (set as (v: string) => void)(e.target.value)}
+                className="w-full px-2 py-1.5 rounded-xl text-[13px] outline-none"
+                style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }}>
+                {TIME_OPTIONS.map((t) => <option key={t} value={t}>{formatTime(t)}</option>)}
+              </select>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Recurrence */}
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>Repeat</p>
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {RECURRENCE_OPTIONS.map((r) => (
+            <button key={r.value} onClick={() => setRecurrence(r.value)}
+              className="px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors"
+              style={{
+                background: recurrence === r.value ? N.selected : N.hover,
+                color: recurrence === r.value ? N.accent : N.muted,
+                border: recurrence === r.value ? `1.5px solid ${N.accent}` : "1.5px solid transparent",
+              }}>
+              {r.label}
+            </button>
+          ))}
+        </div>
+        {recurrence !== "none" && (
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: N.muted }}>Repeat until</p>
+            <input type="date" value={recurrenceEnd} onChange={(e) => setRecurrenceEnd(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-xl text-[13px] outline-none"
+              style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
+          </div>
+        )}
+      </div>
+
+      <button
+        onClick={onSubmit}
+        disabled={saving || !title.trim()}
+        className="w-full py-2.5 rounded-xl text-[13px] font-semibold transition-colors disabled:opacity-40"
+        style={{ background: N.text, color: "white" }}>
+        {saving ? "Saving…" : submitLabel}
+      </button>
+    </div>
+  );
+}
+
 // ─── Add Event Modal ───────────────────────────────────────────────────────────
 
 function AddEventModal({ date, onClose, onAdd }: {
@@ -75,101 +204,152 @@ function AddEventModal({ date, onClose, onAdd }: {
   const [endTime, setEndTime] = useState("10:00");
   const [eventDate, setEventDate] = useState(date);
   const [allDay, setAllDay] = useState(false);
+  const [recurrence, setRecurrence] = useState<Recurrence>("none");
+  const [recurrenceEnd, setRecurrenceEnd] = useState("");
   const [saving, setSaving] = useState(false);
 
   const [y, m, d] = date.split("-").map(Number);
   const label = new Date(y, m - 1, d).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
+  const handleSubmit = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    await onAdd({
+      date: eventDate,
+      title: title.trim(),
+      start_time: allDay ? "00:00" : startTime,
+      end_time: allDay ? "23:59" : endTime,
+      all_day: allDay,
+      type,
+      recurrence: recurrence === "none" ? null : recurrence,
+      recurrence_end: recurrence !== "none" && recurrenceEnd ? recurrenceEnd : null,
+    });
+    setSaving(false);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-end lg:items-center lg:justify-center">
       <div className="overlay-enter absolute inset-0 bg-black/20" onClick={onClose} />
-      <div className="modal-enter relative w-full lg:max-w-md rounded-t-2xl lg:rounded-2xl"
-        style={{ background: N.bg, border: `1px solid ${N.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.14)" }}>
+      <div className="modal-enter relative w-full lg:max-w-md rounded-t-2xl lg:rounded-2xl overflow-y-auto"
+        style={{ background: N.bg, border: `1px solid ${N.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.14)", maxHeight: "92vh" }}>
         <div className="w-8 h-1 rounded-full mx-auto mt-3 lg:hidden" style={{ background: N.border }} />
         <div className="px-5 py-5 pb-10 lg:pb-5">
           <p className="text-[11px] font-semibold uppercase tracking-widest mb-1" style={{ color: N.muted }}>{label}</p>
           <h3 className="text-[17px] font-bold mb-4" style={{ color: N.text }}>New Event</h3>
-          <div className="space-y-3">
-            <input autoFocus type="text" placeholder="Event title" value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl text-[14px] outline-none"
-              style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
-
-            {/* Date */}
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>Date</p>
-              <input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-xl text-[13px] outline-none"
-                style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
-            </div>
-
-            {/* All-day toggle */}
-            <button onClick={() => setAllDay(!allDay)}
-              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl transition-colors text-[13px]"
-              style={{ background: allDay ? N.selected : N.hover, color: N.text }}>
-              <div className="w-8 h-5 rounded-full relative transition-colors flex-shrink-0"
-                style={{ background: allDay ? N.accent : N.border }}>
-                <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
-                  style={{ left: allDay ? "calc(100% - 18px)" : 2 }} />
-              </div>
-              All day
-            </button>
-
-            {/* Type */}
-            <div className="flex flex-wrap gap-1.5">
-              {(Object.keys(TYPES) as EventType[]).map((k) => (
-                <button key={k} onClick={() => setType(k)}
-                  className="px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors"
-                  style={{
-                    background: type === k ? TYPES[k].bg : N.hover,
-                    color: type === k ? TYPES[k].text : N.muted,
-                    border: type === k ? `1.5px solid ${TYPES[k].accent}` : "1.5px solid transparent",
-                  }}>
-                  {TYPES[k].label}
-                </button>
-              ))}
-            </div>
-
-            {/* Times — hidden when all day */}
-            {!allDay && (
-              <div className="grid grid-cols-2 gap-2">
-                {([["Start", startTime, setStartTime], ["End", endTime, setEndTime]] as const).map(([lbl, val, set]) => (
-                  <div key={lbl}>
-                    <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: N.muted }}>{lbl}</p>
-                    <select value={val} onChange={(e) => (set as (v: string) => void)(e.target.value)}
-                      className="w-full px-2 py-1.5 rounded-xl text-[13px] outline-none"
-                      style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }}>
-                      {TIME_OPTIONS.map((t) => <option key={t} value={t}>{formatTime(t)}</option>)}
-                    </select>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <button
-              onClick={async () => {
-                if (!title.trim()) return;
-                setSaving(true);
-                await onAdd({
-                  date: eventDate,
-                  title: title.trim(),
-                  start_time: allDay ? "00:00" : startTime,
-                  end_time: allDay ? "23:59" : endTime,
-                  all_day: allDay,
-                  type,
-                });
-                setSaving(false);
-              }}
-              disabled={saving || !title.trim()}
-              className="w-full py-2.5 rounded-xl text-[13px] font-semibold transition-colors disabled:opacity-40"
-              style={{ background: N.text, color: "white" }}>
-              {saving ? "Saving…" : "Add Event"}
-            </button>
-          </div>
+          <EventForm
+            title={title} setTitle={setTitle}
+            type={type} setType={setType}
+            eventDate={eventDate} setEventDate={setEventDate}
+            allDay={allDay} setAllDay={setAllDay}
+            startTime={startTime} setStartTime={setStartTime}
+            endTime={endTime} setEndTime={setEndTime}
+            recurrence={recurrence} setRecurrence={setRecurrence}
+            recurrenceEnd={recurrenceEnd} setRecurrenceEnd={setRecurrenceEnd}
+            saving={saving} onSubmit={handleSubmit} submitLabel="Add Event"
+          />
         </div>
       </div>
     </div>
   );
+}
+
+// ─── Edit Event Modal ──────────────────────────────────────────────────────────
+
+function EditEventModal({ event, onClose, onSave }: {
+  event: CalendarEvent;
+  onClose: () => void;
+  onSave: (id: string, updates: Omit<CalendarEvent, "id" | "created_at">) => Promise<void>;
+}) {
+  const [title, setTitle] = useState(event.title);
+  const [type, setType] = useState<EventType>(event.type);
+  const [eventDate, setEventDate] = useState(event.date);
+  const [allDay, setAllDay] = useState(event.all_day ?? false);
+  const [startTime, setStartTime] = useState(event.start_time || "09:00");
+  const [endTime, setEndTime] = useState(event.end_time || "10:00");
+  const [recurrence, setRecurrence] = useState<Recurrence>(event.recurrence ?? "none");
+  const [recurrenceEnd, setRecurrenceEnd] = useState(event.recurrence_end ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    await onSave(event.id, {
+      date: eventDate,
+      title: title.trim(),
+      start_time: allDay ? "00:00" : startTime,
+      end_time: allDay ? "23:59" : endTime,
+      all_day: allDay,
+      type,
+      recurrence: recurrence === "none" ? null : recurrence,
+      recurrence_end: recurrence !== "none" && recurrenceEnd ? recurrenceEnd : null,
+    });
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end lg:items-center lg:justify-center">
+      <div className="overlay-enter absolute inset-0 bg-black/20" onClick={onClose} />
+      <div className="modal-enter relative w-full lg:max-w-md rounded-t-2xl lg:rounded-2xl overflow-y-auto"
+        style={{ background: N.bg, border: `1px solid ${N.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.14)", maxHeight: "92vh" }}>
+        <div className="w-8 h-1 rounded-full mx-auto mt-3 lg:hidden" style={{ background: N.border }} />
+        <div className="px-5 py-5 pb-10 lg:pb-5">
+          <h3 className="text-[17px] font-bold mb-4" style={{ color: N.text }}>Edit Event</h3>
+          <EventForm
+            title={title} setTitle={setTitle}
+            type={type} setType={setType}
+            eventDate={eventDate} setEventDate={setEventDate}
+            allDay={allDay} setAllDay={setAllDay}
+            startTime={startTime} setStartTime={setStartTime}
+            endTime={endTime} setEndTime={setEndTime}
+            recurrence={recurrence} setRecurrence={setRecurrence}
+            recurrenceEnd={recurrenceEnd} setRecurrenceEnd={setRecurrenceEnd}
+            saving={saving} onSubmit={handleSubmit} submitLabel="Save Changes"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Expand recurring events for a given month ───────────────────────────────
+
+function expandRecurring(events: CalendarEvent[], year: number, month: number): CalendarEvent[] {
+  const result: CalendarEvent[] = [];
+  const firstOfMonth = new Date(year, month, 1);
+  const lastOfMonth = new Date(year, month + 1, 0);
+
+  for (const ev of events) {
+    if (!ev.recurrence || ev.recurrence === "none") {
+      result.push(ev);
+      continue;
+    }
+
+    const origin = new Date(ev.date + "T12:00:00");
+    const endDate = ev.recurrence_end ? new Date(ev.recurrence_end + "T23:59:59") : new Date(year + 2, 0, 1);
+
+    // Walk from origin, stepping by recurrence interval, collecting dates in this month
+    const cur = new Date(origin);
+    let iterations = 0;
+
+    while (cur <= lastOfMonth && cur <= endDate && iterations < 3650) {
+      iterations++;
+      if (cur >= firstOfMonth) {
+        const ds = toDateStr(cur);
+        if (ds !== ev.date) { // don't double-add the original
+          result.push({ ...ev, id: `${ev.id}__${ds}`, date: ds });
+        } else {
+          result.push(ev);
+        }
+      }
+
+      if (ev.recurrence === "daily")        cur.setDate(cur.getDate() + 1);
+      else if (ev.recurrence === "weekly")  cur.setDate(cur.getDate() + 7);
+      else if (ev.recurrence === "monthly") cur.setMonth(cur.getMonth() + 1);
+      else break;
+    }
+  }
+
+  return result;
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -183,6 +363,7 @@ export default function CalendarPage() {
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [modal, setModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
 
   useEffect(() => {
     supabase.from("calendar_entries").select("*").order("start_time")
@@ -195,9 +376,18 @@ export default function CalendarPage() {
     setModal(false);
   };
 
+  const updateEvent = async (id: string, updates: Omit<CalendarEvent, "id" | "created_at">) => {
+    // Handle synthetic recurring IDs (e.g. "realId__2025-03-14") — edit the real record
+    const realId = id.includes("__") ? id.split("__")[0] : id;
+    const { data } = await supabase.from("calendar_entries").update(updates).eq("id", realId).select().single();
+    if (data) setEvents((p) => p.map((e) => e.id === realId ? data as CalendarEvent : e));
+    setEditingEvent(null);
+  };
+
   const deleteEvent = async (id: string) => {
-    setEvents((p) => p.filter((e) => e.id !== id));
-    await supabase.from("calendar_entries").delete().eq("id", id);
+    const realId = id.includes("__") ? id.split("__")[0] : id;
+    setEvents((p) => p.filter((e) => e.id !== realId));
+    await supabase.from("calendar_entries").delete().eq("id", realId);
   };
 
   const prevMonth = () => {
@@ -230,19 +420,31 @@ export default function CalendarPage() {
     return arr;
   }, [viewYear, viewMonth]);
 
+  // Expand recurring events for the visible month
+  const expandedEvents = useMemo(
+    () => expandRecurring(events, viewYear, viewMonth),
+    [events, viewYear, viewMonth]
+  );
+
   const eventsByDate = useMemo(() => {
     const m: Record<string, CalendarEvent[]> = {};
-    events.forEach((e) => { if (!m[e.date]) m[e.date] = []; m[e.date].push(e); });
+    expandedEvents.forEach((e) => { if (!m[e.date]) m[e.date] = []; m[e.date].push(e); });
     return m;
-  }, [events]);
+  }, [expandedEvents]);
 
   const selectedEvents = useMemo(
-    () => events.filter((e) => e.date === selectedDate).sort((a, b) => a.start_time.localeCompare(b.start_time)),
-    [events, selectedDate]
+    () => expandedEvents.filter((e) => e.date === selectedDate).sort((a, b) => a.start_time.localeCompare(b.start_time)),
+    [expandedEvents, selectedDate]
   );
 
   const [selY, selM, selD] = selectedDate.split("-").map(Number);
   const selObj = new Date(selY, selM - 1, selD);
+
+  // Find the real event object for editing (not synthetic recurring copy)
+  const findRealEvent = (id: string) => {
+    const realId = id.includes("__") ? id.split("__")[0] : id;
+    return events.find((e) => e.id === realId) ?? null;
+  };
 
   return (
     <div className="min-h-screen pb-24 lg:pb-8" style={{ background: N.bg }}>
@@ -291,7 +493,6 @@ export default function CalendarPage() {
 
       {/* ── Calendar grid ── */}
       <div className="px-2">
-        {/* Border around grid */}
         <div className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${N.border}` }}>
           <div className="grid grid-cols-7" style={{ gap: "1px", background: N.border }}>
             {cells.map(({ date, current }) => {
@@ -330,9 +531,14 @@ export default function CalendarPage() {
                       const t = TYPES[ev.type] ?? TYPES.personal;
                       return (
                         <div key={ev.id}
-                          className="truncate text-[10px] px-1.5 py-0.5 rounded-md font-medium"
+                          className="truncate text-[10px] px-1.5 py-0.5 rounded-md font-medium flex items-center gap-0.5"
                           style={{ background: t.bg, color: t.text }}>
-                          {ev.title}
+                          {ev.recurrence && ev.recurrence !== "none" && (
+                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
+                              <path d="M1 4V10H7M20.49 9C19.24 5.46 15.87 3 12 3C7.21 3 3.47 6.81 3.05 11.5M3.51 15C4.76 18.54 8.13 21 12 21C16.79 21 20.53 17.19 20.95 12.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                          <span className="truncate">{ev.title}</span>
                         </div>
                       );
                     })}
@@ -380,14 +586,35 @@ export default function CalendarPage() {
                   <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: t.accent }} />
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-semibold truncate" style={{ color: N.text }}>{ev.title}</p>
-                    <p className="text-[11px] mt-0.5" style={{ color: N.muted }}>
+                    <p className="text-[11px] mt-0.5 flex items-center gap-1" style={{ color: N.muted }}>
                       {ev.all_day ? "All day" : `${formatTime(ev.start_time)}${ev.end_time ? ` – ${formatTime(ev.end_time)}` : ""}`}
+                      {ev.recurrence && ev.recurrence !== "none" && (
+                        <span className="flex items-center gap-0.5">
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
+                            <path d="M1 4V10H7M20.49 9C19.24 5.46 15.87 3 12 3C7.21 3 3.47 6.81 3.05 11.5M3.51 15C4.76 18.54 8.13 21 12 21C16.79 21 20.53 17.19 20.95 12.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                          {ev.recurrence}
+                        </span>
+                      )}
                     </p>
                   </div>
                   <span className="text-[11px] px-2 py-0.5 rounded-lg font-semibold flex-shrink-0"
                     style={{ background: "white", color: t.text }}>
                     {t.label}
                   </span>
+                  {/* Edit button */}
+                  <button
+                    onClick={() => { const real = findRealEvent(ev.id); if (real) setEditingEvent(real); }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                    style={{ color: N.muted }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = N.accent)}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = N.muted)}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M18.5 2.5C18.8978 2.10217 19.4374 1.87868 20 1.87868C20.5626 1.87868 21.1022 2.10217 21.5 2.5C21.8978 2.89782 22.1213 3.43739 22.1213 4C22.1213 4.56261 21.8978 5.10217 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                  {/* Delete button */}
                   <button onClick={() => deleteEvent(ev.id)}
                     className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                     style={{ color: N.muted }}
@@ -405,8 +632,9 @@ export default function CalendarPage() {
         )}
       </div>
 
-      {/* ── Modal ── */}
+      {/* ── Modals ── */}
       {modal && <AddEventModal date={selectedDate} onClose={() => setModal(false)} onAdd={addEvent} />}
+      {editingEvent && <EditEventModal event={editingEvent} onClose={() => setEditingEvent(null)} onSave={updateEvent} />}
     </div>
   );
 }
