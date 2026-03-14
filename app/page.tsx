@@ -1,25 +1,28 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type TaskType = "homework" | "exam" | "personal" | "project";
+type EventType = "homework" | "exam" | "personal" | "project";
 
 interface Task {
   id: string;
   name: string;
-  type: TaskType;
+  type: EventType;
   deadline: string;
   done: boolean;
   created_at?: string;
 }
 
-interface CalendarEntry {
+interface CalendarEvent {
   id: string;
-  date: string; // YYYY-MM-DD
-  note: string;
+  date: string;       // "YYYY-MM-DD"
+  title: string;
+  start_time: string; // "HH:MM" 24h
+  end_time: string;   // "HH:MM" 24h
+  type: EventType;
   created_at?: string;
 }
 
@@ -29,18 +32,39 @@ function toDateStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function formatDayLabel(dateStr: string) {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
+function formatTime(t: string) {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+
+function getWeekDays(weekOffset: number): Date[] {
+  const today = new Date();
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() - today.getDay() + weekOffset * 7);
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
+    return d;
   });
 }
 
-// ─── Badge config ─────────────────────────────────────────────────────────────
+const TIME_OPTIONS: string[] = [];
+for (let h = 6; h < 24; h++) {
+  for (let m = 0; m < 60; m += 30) {
+    TIME_OPTIONS.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+  }
+}
 
-const BADGE: Record<TaskType, { label: string; bg: string; text: string; accent: string }> = {
+const DAY_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const DAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+// ─── Color config ─────────────────────────────────────────────────────────────
+
+const TYPE_CONFIG: Record<EventType, { label: string; bg: string; text: string; accent: string }> = {
   homework: { label: "Homework", bg: "#FEF3C7", text: "#92400E", accent: "#F59E0B" },
   exam:     { label: "Exam",     bg: "#FFE4E6", text: "#9F1239", accent: "#F43F5E" },
   personal: { label: "Personal", bg: "#CCFBF1", text: "#0F766E", accent: "#14B8A6" },
@@ -49,88 +73,90 @@ const BADGE: Record<TaskType, { label: string; bg: string; text: string; accent:
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
+function ChevronLeft() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function ChevronRight() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 function CheckIcon() {
   return (
-    <svg width="11" height="8" viewBox="0 0 11 8" fill="none" aria-hidden="true">
+    <svg width="11" height="8" viewBox="0 0 11 8" fill="none">
       <path d="M1 3.5L4 6.5L10 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
-
 function ClockIcon() {
   return (
-    <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
       <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5" />
       <path d="M8 5V8.5L10.5 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
-
+function PlusSmIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  );
+}
 function PlusIcon() {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
       <path d="M12 5V19M5 12H19" stroke="#0B1437" strokeWidth="2.5" strokeLinecap="round" />
     </svg>
   );
 }
-
-function ChevronLeft() {
+function TrashIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
 
-function ChevronRight() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
+// ─── Week Strip ───────────────────────────────────────────────────────────────
 
-// ─── Mini Calendar ────────────────────────────────────────────────────────────
-
-const DAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-
-function MiniCalendar({
-  entryDates,
+function WeekStrip({
+  weekOffset,
+  setWeekOffset,
   selectedDate,
   onSelectDate,
+  eventDates,
 }: {
-  entryDates: Set<string>;
+  weekOffset: number;
+  setWeekOffset: (n: number) => void;
   selectedDate: string;
   onSelectDate: (d: string) => void;
+  eventDates: Set<string>;
 }) {
   const todayStr = toDateStr(new Date());
-  const [viewDate, setViewDate] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
+  const days = getWeekDays(weekOffset);
+  const firstDay = days[0];
+  const lastDay = days[6];
 
-  const year = viewDate.getFullYear();
-  const month = viewDate.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDow = new Date(year, month, 1).getDay();
-
-  const monthLabel = viewDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-
-  const cells: (string | null)[] = [];
-  for (let i = 0; i < firstDow; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push(`${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
-  }
+  const monthLabel =
+    firstDay.getMonth() === lastDay.getMonth()
+      ? `${MONTH_SHORT[firstDay.getMonth()]} ${firstDay.getFullYear()}`
+      : `${MONTH_SHORT[firstDay.getMonth()]} – ${MONTH_SHORT[lastDay.getMonth()]} ${lastDay.getFullYear()}`;
 
   return (
-    <div className="bg-white rounded-2xl px-4 pt-4 pb-3 shadow-sm">
-      {/* Month nav */}
-      <div className="flex items-center justify-between mb-3">
+    <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: "0 1px 4px rgba(11,20,55,0.08)" }}>
+      {/* Month row */}
+      <div className="flex items-center justify-between px-4 pt-3.5 pb-2">
         <button
-          onClick={() => setViewDate(new Date(year, month - 1, 1))}
-          className="w-8 h-8 flex items-center justify-center rounded-full transition-colors active:bg-[#EEF1F8]"
+          onClick={() => setWeekOffset(weekOffset - 1)}
+          className="w-8 h-8 flex items-center justify-center rounded-full transition-colors active:bg-[#F4F6FD]"
           style={{ color: "#4A5B9A" }}
-          aria-label="Previous month"
         >
           <ChevronLeft />
         </button>
@@ -138,59 +164,57 @@ function MiniCalendar({
           {monthLabel}
         </span>
         <button
-          onClick={() => setViewDate(new Date(year, month + 1, 1))}
-          className="w-8 h-8 flex items-center justify-center rounded-full transition-colors active:bg-[#EEF1F8]"
+          onClick={() => setWeekOffset(weekOffset + 1)}
+          className="w-8 h-8 flex items-center justify-center rounded-full transition-colors active:bg-[#F4F6FD]"
           style={{ color: "#4A5B9A" }}
-          aria-label="Next month"
         >
           <ChevronRight />
         </button>
       </div>
 
-      {/* Day-of-week headers */}
-      <div className="grid grid-cols-7 mb-1">
-        {DAY_LABELS.map((l) => (
-          <div
-            key={l}
-            className="text-center text-[10px] font-semibold py-1"
-            style={{ fontFamily: "var(--font-outfit)", color: "#A0ABBB" }}
-          >
-            {l}
-          </div>
-        ))}
-      </div>
-
-      {/* Day grid */}
-      <div className="grid grid-cols-7">
-        {cells.map((dateStr, i) => {
-          if (!dateStr) return <div key={i} />;
-          const day = parseInt(dateStr.split("-")[2]);
+      {/* Days row */}
+      <div className="grid grid-cols-7 px-2 pb-3">
+        {days.map((day) => {
+          const dateStr = toDateStr(day);
           const isToday = dateStr === todayStr;
           const isSelected = dateStr === selectedDate;
-          const hasEntry = entryDates.has(dateStr);
+          const hasEvents = eventDates.has(dateStr);
 
-          let bg = "transparent";
-          let color = "#0B1437";
-          if (isSelected) { bg = "#0B1437"; color = "white"; }
-          else if (isToday) { bg = "#F5C518"; color = "#0B1437"; }
+          let circleBg = "transparent";
+          let circleColor = "#3D4F7C";
+          if (isSelected) { circleBg = "#0B1437"; circleColor = "white"; }
+          else if (isToday) { circleBg = "#F5C518"; circleColor = "#0B1437"; }
 
           return (
             <button
               key={dateStr}
               onClick={() => onSelectDate(dateStr)}
-              className="flex flex-col items-center justify-center py-0.5"
+              className="flex flex-col items-center gap-1 py-1"
             >
-              <div
-                className="w-8 h-8 flex items-center justify-center rounded-full text-[13px] font-medium transition-all active:opacity-70"
-                style={{ backgroundColor: bg, color, fontFamily: "var(--font-outfit)" }}
+              <span
+                className="text-[10px] font-semibold uppercase"
+                style={{
+                  fontFamily: "var(--font-outfit)",
+                  color: isSelected ? "#0B1437" : "#A0ABBB",
+                }}
               >
-                {day}
+                {DAY_SHORT[day.getDay()]}
+              </span>
+              <div
+                className="w-9 h-9 flex items-center justify-center rounded-full text-[14px] font-semibold transition-all active:scale-90"
+                style={{
+                  backgroundColor: circleBg,
+                  color: circleColor,
+                  fontFamily: "var(--font-outfit)",
+                }}
+              >
+                {day.getDate()}
               </div>
               <div
-                className="w-1 h-1 rounded-full mt-0.5 transition-opacity"
+                className="w-1.5 h-1.5 rounded-full transition-opacity"
                 style={{
                   backgroundColor: isSelected ? "#6B7FBF" : "#F5C518",
-                  opacity: hasEntry ? 1 : 0,
+                  opacity: hasEvents ? 1 : 0,
                 }}
               />
             </button>
@@ -201,60 +225,96 @@ function MiniCalendar({
   );
 }
 
-// ─── Entry Card ───────────────────────────────────────────────────────────────
+// ─── Event Card ───────────────────────────────────────────────────────────────
 
-function EntryCard({ entry, onDelete }: { entry: CalendarEntry; onDelete: (id: string) => void }) {
-  const time = entry.created_at
-    ? new Date(entry.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-    : "";
+function EventCard({ event, onDelete }: { event: CalendarEvent; onDelete: (id: string) => void }) {
+  const cfg = TYPE_CONFIG[event.type] ?? TYPE_CONFIG.personal;
+  const timeLabel = event.end_time
+    ? `${formatTime(event.start_time)} – ${formatTime(event.end_time)}`
+    : formatTime(event.start_time);
+
   return (
     <div
-      className="card-enter bg-white rounded-2xl px-4 py-3.5 shadow-sm flex items-start gap-3"
-      style={{ borderLeft: "3px solid #F5C518" }}
+      className="card-enter flex gap-3 bg-white rounded-2xl px-4 py-3.5"
+      style={{ boxShadow: "0 1px 4px rgba(11,20,55,0.07)", borderLeft: `3px solid ${cfg.accent}` }}
     >
-      <div className="flex-1 min-w-0">
-        <p className="text-[13.5px] font-medium leading-snug" style={{ fontFamily: "var(--font-outfit)", color: "#0B1437" }}>
-          {entry.note}
+      {/* Time column */}
+      <div className="flex-shrink-0 w-[72px]">
+        <p className="text-[11px] font-semibold tabular-nums leading-none" style={{ fontFamily: "var(--font-outfit)", color: cfg.accent }}>
+          {formatTime(event.start_time)}
         </p>
-        {time && (
-          <p className="text-[10px] mt-1" style={{ fontFamily: "var(--font-outfit)", color: "#A0ABBB" }}>
-            {time}
+        {event.end_time && (
+          <p className="text-[10px] tabular-nums mt-0.5" style={{ fontFamily: "var(--font-outfit)", color: "#A0ABBB" }}>
+            {formatTime(event.end_time)}
           </p>
         )}
       </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <p className="text-[13.5px] font-medium leading-snug" style={{ fontFamily: "var(--font-outfit)", color: "#0B1437" }}>
+          {event.title}
+        </p>
+        <span
+          className="inline-block mt-1.5 text-[9.5px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full"
+          style={{ backgroundColor: cfg.bg, color: cfg.text, fontFamily: "var(--font-outfit)" }}
+        >
+          {cfg.label}
+        </span>
+      </div>
+
       <button
-        onClick={() => onDelete(entry.id)}
-        className="w-6 h-6 flex items-center justify-center rounded-full flex-shrink-0 active:scale-90 transition-transform mt-0.5"
+        onClick={() => onDelete(event.id)}
+        className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full self-start active:scale-90 transition-transform mt-0.5"
         style={{ color: "#CBD5E1" }}
-        aria-label="Delete entry"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-          <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
+        <TrashIcon />
       </button>
     </div>
   );
 }
 
-// ─── Add Entry Modal ──────────────────────────────────────────────────────────
+// ─── Add Event Modal ──────────────────────────────────────────────────────────
 
-function AddEntryModal({
+function AddEventModal({
   date,
   onClose,
   onAdd,
 }: {
   date: string;
   onClose: () => void;
-  onAdd: (note: string) => Promise<void>;
+  onAdd: (e: Omit<CalendarEvent, "id" | "created_at">) => Promise<void>;
 }) {
-  const [note, setNote] = useState("");
+  const [title, setTitle] = useState("");
+  const [type, setType] = useState<EventType>("personal");
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("10:00");
   const [saving, setSaving] = useState(false);
 
-  const handleAdd = async () => {
-    if (!note.trim()) return;
+  const [y, m, d] = date.split("-").map(Number);
+  const dateLabel = new Date(y, m - 1, d).toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric",
+  });
+
+  const handleSave = async () => {
+    if (!title.trim()) return;
     setSaving(true);
-    await onAdd(note.trim());
+    await onAdd({ date, title: title.trim(), start_time: startTime, end_time: endTime, type });
     setSaving(false);
+  };
+
+  const selectStyle = {
+    fontFamily: "var(--font-outfit)",
+    fontSize: 14,
+    color: "#0B1437",
+    background: "#F4F6FD",
+    border: "none",
+    borderRadius: 12,
+    padding: "12px 14px",
+    width: "100%",
+    appearance: "none" as const,
+    WebkitAppearance: "none" as const,
+    outline: "none",
   };
 
   return (
@@ -262,35 +322,76 @@ function AddEntryModal({
       <div className="overlay-enter absolute inset-0 bg-black/40" onClick={onClose} />
       <div
         className="modal-enter relative w-full bg-white rounded-t-3xl px-5 pt-5 pb-10 shadow-2xl"
-        style={{ maxHeight: "90dvh", overflowY: "auto" }}
+        style={{ maxHeight: "92dvh", overflowY: "auto" }}
       >
         <div className="w-10 h-1 bg-[#E2E8F0] rounded-full mx-auto mb-5" />
-        <p
-          className="text-[10.5px] font-semibold uppercase tracking-[0.18em] mb-1"
-          style={{ fontFamily: "var(--font-outfit)", color: "#8A93B8" }}
-        >
-          {formatDayLabel(date)}
+        <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] mb-1" style={{ fontFamily: "var(--font-outfit)", color: "#8A93B8" }}>
+          {dateLabel}
         </p>
-        <h3 className="text-xl font-semibold text-[#0B1437] mb-5" style={{ fontFamily: "var(--font-playfair)" }}>
-          Log Entry
+        <h3 className="text-[1.4rem] font-semibold text-[#0B1437] mb-5" style={{ fontFamily: "var(--font-playfair)" }}>
+          New Event
         </h3>
-        <div className="space-y-3.5">
-          <textarea
-            placeholder="Write something — a note, a thought, anything…"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={4}
-            className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3.5 text-sm text-[#0B1437] placeholder-[#CBD5E1] outline-none focus:border-[#6B7FBF] transition-colors resize-none"
-            style={{ fontFamily: "var(--font-outfit)" }}
+
+        <div className="space-y-3">
+          {/* Title */}
+          <input
+            type="text"
+            placeholder="Event title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSave()}
             autoFocus
+            className="w-full rounded-xl px-4 py-3.5 text-sm text-[#0B1437] placeholder-[#CBD5E1] outline-none transition-colors"
+            style={{ fontFamily: "var(--font-outfit)", background: "#F4F6FD", border: "none" }}
           />
+
+          {/* Type */}
+          <div className="grid grid-cols-2 gap-2">
+            {(Object.keys(TYPE_CONFIG) as EventType[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => setType(t)}
+                className="py-3 rounded-xl text-[11px] font-semibold uppercase tracking-wide transition-all active:scale-95"
+                style={{
+                  fontFamily: "var(--font-outfit)",
+                  backgroundColor: TYPE_CONFIG[t].bg,
+                  color: TYPE_CONFIG[t].text,
+                  border: type === t ? `2px solid ${TYPE_CONFIG[t].accent}` : "2px solid transparent",
+                  opacity: type === t ? 1 : 0.6,
+                }}
+              >
+                {TYPE_CONFIG[t].label}
+              </button>
+            ))}
+          </div>
+
+          {/* Times */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide mb-1.5 px-1" style={{ fontFamily: "var(--font-outfit)", color: "#8A93B8" }}>Start</p>
+              <select value={startTime} onChange={(e) => setStartTime(e.target.value)} style={selectStyle}>
+                {TIME_OPTIONS.map((t) => (
+                  <option key={t} value={t}>{formatTime(t)}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide mb-1.5 px-1" style={{ fontFamily: "var(--font-outfit)", color: "#8A93B8" }}>End</p>
+              <select value={endTime} onChange={(e) => setEndTime(e.target.value)} style={selectStyle}>
+                {TIME_OPTIONS.map((t) => (
+                  <option key={t} value={t}>{formatTime(t)}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <button
-            onClick={handleAdd}
-            disabled={saving || !note.trim()}
-            className="w-full bg-[#0B1437] text-white py-4 rounded-2xl text-sm font-semibold tracking-wide active:scale-[0.98] transition-all disabled:opacity-50"
-            style={{ fontFamily: "var(--font-outfit)" }}
+            onClick={handleSave}
+            disabled={saving || !title.trim()}
+            className="w-full text-white py-4 rounded-2xl text-sm font-semibold tracking-wide active:scale-[0.98] transition-all disabled:opacity-50 mt-1"
+            style={{ fontFamily: "var(--font-outfit)", background: "#0B1437" }}
           >
-            {saving ? "Saving…" : "Save Entry"}
+            {saving ? "Saving…" : "Add Event"}
           </button>
         </div>
       </div>
@@ -301,22 +402,22 @@ function AddEntryModal({
 // ─── Task Card ────────────────────────────────────────────────────────────────
 
 function TaskCard({ task, index, onToggle }: { task: Task; index: number; onToggle: (id: string) => void }) {
-  const badge = BADGE[task.type];
+  const cfg = TYPE_CONFIG[task.type];
   return (
     <div
-      className="card-enter bg-white rounded-2xl px-4 py-4 flex items-start gap-3.5 shadow-sm"
+      className="card-enter bg-white rounded-2xl px-4 py-4 flex items-start gap-3.5"
       style={{
-        borderLeft: `3px solid ${badge.accent}`,
         animationDelay: `${index * 55}ms`,
-        opacity: task.done ? 0.55 : 1,
+        opacity: task.done ? 0.5 : 1,
         transition: "opacity 0.3s ease",
+        borderLeft: `3px solid ${cfg.accent}`,
+        boxShadow: "0 1px 4px rgba(11,20,55,0.07)",
       }}
     >
       <button
         onClick={() => onToggle(task.id)}
         className="mt-0.5 w-[26px] h-[26px] rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 active:scale-90"
-        style={task.done ? { backgroundColor: badge.accent, borderColor: badge.accent } : { borderColor: "#CBD5E1" }}
-        aria-label={task.done ? "Mark incomplete" : "Mark complete"}
+        style={task.done ? { backgroundColor: cfg.accent, borderColor: cfg.accent } : { borderColor: "#CBD5E1" }}
       >
         {task.done && <CheckIcon />}
       </button>
@@ -333,10 +434,10 @@ function TaskCard({ task, index, onToggle }: { task: Task; index: number; onTogg
         </p>
         <div className="flex items-center gap-2 flex-wrap">
           <span
-            className="text-[10px] font-semibold uppercase tracking-wide px-2.5 py-0.5 rounded-full"
-            style={{ fontFamily: "var(--font-outfit)", backgroundColor: badge.bg, color: badge.text }}
+            className="text-[9.5px] font-semibold uppercase tracking-wide px-2.5 py-0.5 rounded-full"
+            style={{ fontFamily: "var(--font-outfit)", backgroundColor: cfg.bg, color: cfg.text }}
           >
-            {badge.label}
+            {cfg.label}
           </span>
           <span className="flex items-center gap-1 text-[11px]" style={{ fontFamily: "var(--font-outfit)", color: "#A0ABBB" }}>
             <ClockIcon />
@@ -355,10 +456,10 @@ function AddTaskModal({
   onAdd,
 }: {
   onClose: () => void;
-  onAdd: (task: Omit<Task, "id" | "done" | "created_at">) => Promise<void>;
+  onAdd: (t: Omit<Task, "id" | "done" | "created_at">) => Promise<void>;
 }) {
   const [name, setName] = useState("");
-  const [type, setType] = useState<TaskType>("homework");
+  const [type, setType] = useState<EventType>("homework");
   const [deadline, setDeadline] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -372,40 +473,37 @@ function AddTaskModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end">
       <div className="overlay-enter absolute inset-0 bg-black/40" onClick={onClose} />
-      <div
-        className="modal-enter relative w-full bg-white rounded-t-3xl px-5 pt-5 pb-10 shadow-2xl"
-        style={{ maxHeight: "90dvh", overflowY: "auto" }}
-      >
+      <div className="modal-enter relative w-full bg-white rounded-t-3xl px-5 pt-5 pb-10 shadow-2xl" style={{ maxHeight: "90dvh", overflowY: "auto" }}>
         <div className="w-10 h-1 bg-[#E2E8F0] rounded-full mx-auto mb-5" />
-        <h3 className="text-xl font-semibold text-[#0B1437] mb-5" style={{ fontFamily: "var(--font-playfair)" }}>
+        <h3 className="text-[1.4rem] font-semibold text-[#0B1437] mb-5" style={{ fontFamily: "var(--font-playfair)" }}>
           New Task
         </h3>
-        <div className="space-y-3.5">
+        <div className="space-y-3">
           <input
             type="text"
             placeholder="What do you need to do?"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-            className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3.5 text-sm text-[#0B1437] placeholder-[#CBD5E1] outline-none focus:border-[#6B7FBF] transition-colors"
-            style={{ fontFamily: "var(--font-outfit)" }}
             autoFocus
+            className="w-full rounded-xl px-4 py-3.5 text-sm text-[#0B1437] placeholder-[#CBD5E1] outline-none"
+            style={{ fontFamily: "var(--font-outfit)", background: "#F4F6FD" }}
           />
           <div className="grid grid-cols-2 gap-2">
-            {(Object.keys(BADGE) as TaskType[]).map((t) => (
+            {(Object.keys(TYPE_CONFIG) as EventType[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setType(t)}
                 className="py-3 rounded-xl text-[11px] font-semibold uppercase tracking-wide transition-all active:scale-95"
                 style={{
                   fontFamily: "var(--font-outfit)",
-                  backgroundColor: BADGE[t].bg,
-                  color: BADGE[t].text,
-                  border: type === t ? `2px solid ${BADGE[t].accent}` : "2px solid transparent",
-                  opacity: type === t ? 1 : 0.65,
+                  backgroundColor: TYPE_CONFIG[t].bg,
+                  color: TYPE_CONFIG[t].text,
+                  border: type === t ? `2px solid ${TYPE_CONFIG[t].accent}` : "2px solid transparent",
+                  opacity: type === t ? 1 : 0.6,
                 }}
               >
-                {BADGE[t].label}
+                {TYPE_CONFIG[t].label}
               </button>
             ))}
           </div>
@@ -414,14 +512,14 @@ function AddTaskModal({
             placeholder="Deadline — e.g. Today, 5:00 PM"
             value={deadline}
             onChange={(e) => setDeadline(e.target.value)}
-            className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3.5 text-sm text-[#0B1437] placeholder-[#CBD5E1] outline-none focus:border-[#6B7FBF] transition-colors"
-            style={{ fontFamily: "var(--font-outfit)" }}
+            className="w-full rounded-xl px-4 py-3.5 text-sm text-[#0B1437] placeholder-[#CBD5E1] outline-none"
+            style={{ fontFamily: "var(--font-outfit)", background: "#F4F6FD" }}
           />
           <button
             onClick={handleAdd}
             disabled={saving}
-            className="w-full bg-[#0B1437] text-white py-4 rounded-2xl text-sm font-semibold tracking-wide active:scale-[0.98] transition-all disabled:opacity-60"
-            style={{ fontFamily: "var(--font-outfit)" }}
+            className="w-full text-white py-4 rounded-2xl text-sm font-semibold tracking-wide active:scale-[0.98] transition-all disabled:opacity-60"
+            style={{ fontFamily: "var(--font-outfit)", background: "#0B1437" }}
           >
             {saving ? "Saving…" : "Add Task"}
           </button>
@@ -437,15 +535,13 @@ export default function Home() {
   const today = new Date();
   const todayStr = toDateStr(today);
 
-  // Tasks
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
-  const [showTaskModal, setShowTaskModal] = useState(false);
-
-  // Calendar entries
-  const [entries, setEntries] = useState<CalendarEntry[]>([]);
+  const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState(todayStr);
-  const [showEntryModal, setShowEntryModal] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [showEventModal, setShowEventModal] = useState(false);
 
   // Load tasks
   useEffect(() => {
@@ -459,14 +555,14 @@ export default function Home() {
       });
   }, []);
 
-  // Load calendar entries
+  // Load calendar events
   useEffect(() => {
     supabase
       .from("calendar_entries")
       .select("*")
-      .order("created_at", { ascending: true })
+      .order("start_time", { ascending: true })
       .then(({ data }) => {
-        if (data) setEntries(data as CalendarEntry[]);
+        if (data) setEvents(data as CalendarEvent[]);
       });
   }, []);
 
@@ -484,18 +580,14 @@ export default function Home() {
     setShowTaskModal(false);
   };
 
-  const addEntry = async (note: string) => {
-    const { data } = await supabase
-      .from("calendar_entries")
-      .insert({ date: selectedDate, note })
-      .select()
-      .single();
-    if (data) setEntries((prev) => [...prev, data as CalendarEntry]);
-    setShowEntryModal(false);
+  const addEvent = async (event: Omit<CalendarEvent, "id" | "created_at">) => {
+    const { data } = await supabase.from("calendar_entries").insert(event).select().single();
+    if (data) setEvents((prev) => [...prev, data as CalendarEvent].sort((a, b) => a.start_time.localeCompare(b.start_time)));
+    setShowEventModal(false);
   };
 
-  const deleteEntry = async (id: string) => {
-    setEntries((prev) => prev.filter((e) => e.id !== id));
+  const deleteEvent = async (id: string) => {
+    setEvents((prev) => prev.filter((e) => e.id !== id));
     await supabase.from("calendar_entries").delete().eq("id", id);
   };
 
@@ -503,104 +595,126 @@ export default function Home() {
   const total = tasks.length;
   const progress = total > 0 ? (done / total) * 100 : 0;
 
-  const dayName = today.toLocaleDateString("en-US", { weekday: "long" });
-  const dateStr = today.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+  const eventDates = useMemo(() => new Set(events.map((e) => e.date)), [events]);
+  const selectedEvents = useMemo(
+    () => events.filter((e) => e.date === selectedDate).sort((a, b) => a.start_time.localeCompare(b.start_time)),
+    [events, selectedDate]
+  );
+  const sortedTasks = [...tasks.filter((t) => !t.done), ...tasks.filter((t) => t.done)];
 
-  const entryDates = new Set(entries.map((e) => e.date));
-  const selectedEntries = entries.filter((e) => e.date === selectedDate);
-  const sorted = [...tasks.filter((t) => !t.done), ...tasks.filter((t) => t.done)];
+  const [selY, selM, selD] = selectedDate.split("-").map(Number);
+  const selectedDateObj = new Date(selY, selM - 1, selD);
+  const selectedLabel = `${DAY_FULL[selectedDateObj.getDay()]}, ${MONTH_SHORT[selectedDateObj.getMonth()]} ${selD}`;
 
   return (
-    <div className="min-h-screen" style={{ background: "#EEF1F8" }}>
+    <div className="min-h-screen" style={{ background: "#F4F6FD" }}>
       {/* ── Header ── */}
-      <div className="px-6 pt-12 pb-8 relative overflow-hidden" style={{ background: "#0B1437" }}>
-        <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full opacity-[0.06]" style={{ background: "#F5C518" }} />
-        <div className="absolute -bottom-8 -left-8 w-36 h-36 rounded-full opacity-[0.04]" style={{ background: "#6B7FBF" }} />
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] mb-2" style={{ fontFamily: "var(--font-outfit)", color: "#4A5B9A" }}>
-          {dayName}
+      <div
+        className="px-6 pt-12 pb-7 relative overflow-hidden"
+        style={{ background: "linear-gradient(160deg, #0D1640 0%, #0B1437 60%, #101D4A 100%)" }}
+      >
+        {/* Decorative orbs */}
+        <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full" style={{ background: "radial-gradient(circle, rgba(245,197,24,0.12) 0%, transparent 70%)" }} />
+        <div className="absolute -bottom-12 -left-10 w-44 h-44 rounded-full" style={{ background: "radial-gradient(circle, rgba(107,127,191,0.1) 0%, transparent 70%)" }} />
+
+        <p className="text-[10.5px] font-semibold uppercase tracking-[0.22em] mb-1.5" style={{ fontFamily: "var(--font-outfit)", color: "#4A5B9A" }}>
+          {today.toLocaleDateString("en-US", { weekday: "long" })}
         </p>
-        <h1 className="text-[2.6rem] font-semibold leading-[1.1] text-white mb-7" style={{ fontFamily: "var(--font-playfair)" }}>
-          {dateStr}
+        <h1 className="text-[2.5rem] font-semibold leading-[1.1] text-white mb-6" style={{ fontFamily: "var(--font-playfair)" }}>
+          {today.toLocaleDateString("en-US", { month: "long", day: "numeric" })}
         </h1>
+
         <div className="flex items-center gap-3">
-          <div className="flex-1 rounded-full h-1" style={{ background: "#1A2654" }}>
-            <div className="h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${progress}%`, background: "#F5C518" }} />
+          <div className="flex-1 rounded-full h-[3px]" style={{ background: "#1A2654" }}>
+            <div
+              className="h-full rounded-full transition-all duration-700 ease-out"
+              style={{ width: `${progress}%`, background: "linear-gradient(90deg, #F5C518, #FFD84D)" }}
+            />
           </div>
-          <span className="text-[11px] whitespace-nowrap tabular-nums" style={{ fontFamily: "var(--font-outfit)", color: "#4A5B9A" }}>
-            {done} / {total} done
+          <span className="text-[11px] whitespace-nowrap tabular-nums font-medium" style={{ fontFamily: "var(--font-outfit)", color: "#4A5B9A" }}>
+            {done}/{total} tasks
           </span>
         </div>
       </div>
 
-      <div className="px-4 pt-5 pb-32 space-y-5">
-        {/* ── Calendar ── */}
-        <div>
-          <div className="flex items-center justify-between px-1 mb-3">
-            <span className="text-[10.5px] font-semibold uppercase tracking-[0.18em]" style={{ fontFamily: "var(--font-outfit)", color: "#8A93B8" }}>
-              Calendar
-            </span>
-          </div>
-          <MiniCalendar
-            entryDates={entryDates}
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-          />
-        </div>
+      <div className="px-4 pt-4 pb-32 space-y-4">
+        {/* ── Week strip ── */}
+        <WeekStrip
+          weekOffset={weekOffset}
+          setWeekOffset={setWeekOffset}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          eventDates={eventDates}
+        />
 
-        {/* ── Day entries ── */}
+        {/* ── Day events ── */}
         <div>
-          <div className="flex items-center justify-between px-1 mb-3">
-            <span className="text-[10.5px] font-semibold uppercase tracking-[0.18em]" style={{ fontFamily: "var(--font-outfit)", color: "#8A93B8" }}>
-              {formatDayLabel(selectedDate)}
-            </span>
+          <div className="flex items-center justify-between px-1 mb-2.5">
+            <div>
+              <span className="text-[13px] font-semibold" style={{ fontFamily: "var(--font-outfit)", color: "#0B1437" }}>
+                {selectedLabel}
+              </span>
+              {selectedEvents.length > 0 && (
+                <span className="ml-2 text-[11px]" style={{ fontFamily: "var(--font-outfit)", color: "#A0ABBB" }}>
+                  {selectedEvents.length} event{selectedEvents.length !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
             <button
-              onClick={() => setShowEntryModal(true)}
-              className="text-[11px] font-semibold active:opacity-60 transition-opacity"
-              style={{ fontFamily: "var(--font-outfit)", color: "#F5C518" }}
+              onClick={() => setShowEventModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all active:scale-95"
+              style={{ fontFamily: "var(--font-outfit)", background: "#0B1437", color: "#F5C518" }}
             >
-              + Log entry
+              <PlusSmIcon />
+              Event
             </button>
           </div>
 
-          {selectedEntries.length === 0 ? (
+          {selectedEvents.length === 0 ? (
             <div
-              className="text-center py-6 rounded-2xl bg-white/60"
-              style={{ fontFamily: "var(--font-outfit)", color: "#CBD5E1", fontSize: 13 }}
+              className="rounded-2xl px-4 py-6 text-center"
+              style={{ background: "rgba(255,255,255,0.6)", border: "1.5px dashed #E2E8F0" }}
             >
-              Nothing logged — tap + Log entry
+              <p className="text-[13px]" style={{ fontFamily: "var(--font-outfit)", color: "#C4CEDE" }}>
+                No events — tap <span style={{ color: "#F5C518", fontWeight: 600 }}>+ Event</span> to add one
+              </p>
             </div>
           ) : (
             <div className="space-y-2">
-              {selectedEntries.map((entry) => (
-                <EntryCard key={entry.id} entry={entry} onDelete={deleteEntry} />
+              {selectedEvents.map((event) => (
+                <EventCard key={event.id} event={event} onDelete={deleteEvent} />
               ))}
             </div>
           )}
         </div>
 
-        {/* ── Task list ── */}
+        {/* ── Tasks ── */}
         <div>
-          <div className="flex items-center justify-between px-1 mb-3">
-            <span className="text-[10.5px] font-semibold uppercase tracking-[0.18em]" style={{ fontFamily: "var(--font-outfit)", color: "#8A93B8" }}>
-              Today's Tasks
+          <div className="flex items-center justify-between px-1 mb-2.5">
+            <span className="text-[13px] font-semibold" style={{ fontFamily: "var(--font-outfit)", color: "#0B1437" }}>
+              Tasks
             </span>
-            <span className="text-[11px]" style={{ fontFamily: "var(--font-outfit)", color: "#8A93B8" }}>
+            <span className="text-[11px]" style={{ fontFamily: "var(--font-outfit)", color: "#A0ABBB" }}>
               {tasks.filter((t) => !t.done).length} remaining
             </span>
           </div>
 
           {tasksLoading ? (
             [1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-2xl px-4 py-4 h-[76px] animate-pulse mb-2.5" style={{ borderLeft: "3px solid #E2E8F0" }} />
+              <div key={i} className="bg-white rounded-2xl h-[74px] animate-pulse mb-2" style={{ boxShadow: "0 1px 4px rgba(11,20,55,0.07)" }} />
             ))
-          ) : sorted.length === 0 ? (
-            <div className="text-center py-12" style={{ fontFamily: "var(--font-outfit)", color: "#9CA3AF" }}>
-              <p className="text-3xl mb-3">✓</p>
-              <p className="text-sm">All clear — tap + to add a task.</p>
+          ) : sortedTasks.length === 0 ? (
+            <div
+              className="rounded-2xl px-4 py-6 text-center"
+              style={{ background: "rgba(255,255,255,0.6)", border: "1.5px dashed #E2E8F0" }}
+            >
+              <p className="text-[13px]" style={{ fontFamily: "var(--font-outfit)", color: "#C4CEDE" }}>
+                All clear — tap <span style={{ color: "#F5C518", fontWeight: 600 }}>+</span> to add a task
+              </p>
             </div>
           ) : (
-            <div className="space-y-2.5">
-              {sorted.map((task, i) => (
+            <div className="space-y-2">
+              {sortedTasks.map((task, i) => (
                 <TaskCard key={task.id} task={task} index={i} onToggle={toggleTask} />
               ))}
             </div>
@@ -611,11 +725,11 @@ export default function Home() {
       {/* ── FAB ── */}
       <button
         onClick={() => setShowTaskModal(true)}
-        className="fixed right-5 z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center active:scale-90 transition-transform duration-150"
+        className="fixed right-5 z-40 w-14 h-14 rounded-full flex items-center justify-center active:scale-90 transition-transform duration-150"
         style={{
           bottom: "calc(80px + 1.25rem)",
           background: "#F5C518",
-          boxShadow: "0 4px 20px rgba(245, 197, 24, 0.45)",
+          boxShadow: "0 4px 24px rgba(245,197,24,0.5)",
         }}
         aria-label="Add new task"
       >
@@ -624,8 +738,8 @@ export default function Home() {
 
       {/* ── Modals ── */}
       {showTaskModal && <AddTaskModal onClose={() => setShowTaskModal(false)} onAdd={addTask} />}
-      {showEntryModal && (
-        <AddEntryModal date={selectedDate} onClose={() => setShowEntryModal(false)} onAdd={addEntry} />
+      {showEventModal && (
+        <AddEventModal date={selectedDate} onClose={() => setShowEventModal(false)} onAdd={addEvent} />
       )}
     </div>
   );
