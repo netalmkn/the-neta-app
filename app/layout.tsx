@@ -12,11 +12,25 @@ const jakarta = Plus_Jakarta_Sans({
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  themeColor: "#6366F1",
 };
 
 export const metadata: Metadata = {
-  title: "StudyPlan",
-  description: "Your daily study planner",
+  title: "Neta's Study App",
+  description: "Track tasks, exams, study sessions and your schedule",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Study",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    apple: "/icons/apple-touch-icon.png",
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
