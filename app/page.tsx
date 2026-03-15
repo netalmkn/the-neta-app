@@ -1680,51 +1680,6 @@ export default function Home() {
             )}
           </div>
 
-          {/* ── Study Recommendation ── */}
-          {(studyRecommendation.hours > 0 || undoneTasks.length > 0 || exams.length > 0) && (
-            <div className="mb-10 px-5 py-4 rounded-2xl"
-              style={{ background: "white", border: `1px solid ${N.border}`, boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
-              <div className="flex items-center justify-between gap-4 mb-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-widest mb-0.5" style={{ color: N.muted }}>
-                    Recommended Study Today
-                  </p>
-                  {studyRecommendation.hours > 0 ? (
-                    <p className="text-[28px] font-bold leading-none" style={{ color: N.text }}>
-                      {studyRecommendation.hours}
-                      <span className="text-[16px] font-semibold ml-1" style={{ color: N.muted }}>hours</span>
-                    </p>
-                  ) : (
-                    <p className="text-[16px] font-semibold" style={{ color: "#16A34A" }}>All caught up! 🎉</p>
-                  )}
-                </div>
-                {recommendedSubject && (
-                  <button onClick={() => setModal("study")}
-                    className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all active:scale-95"
-                    style={{ background: N.accent, color: "white" }}>
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: recommendedSubject.color + "99" }} />
-                    {recommendedSubject.name}
-                  </button>
-                )}
-              </div>
-              {studyRecommendation.reasons.length > 0 && (
-                <div className="space-y-1.5 pt-3" style={{ borderTop: `1px solid ${N.border}` }}>
-                  {studyRecommendation.reasons.map((r, i) => (
-                    <div key={i} className="flex items-center justify-between gap-3">
-                      <span className="text-[13px] flex items-center gap-2" style={{ color: N.muted }}>
-                        <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: N.muted }} />
-                        {r.text}
-                      </span>
-                      <span className="text-[12px] font-semibold flex-shrink-0 tabular-nums"
-                        style={{ color: N.text }}>
-                        ~{r.hours}h
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* ── 2-column layout ── */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
