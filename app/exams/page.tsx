@@ -100,19 +100,20 @@ function ExamCategoryBadge({ category }: { category: Task["exam_category"] }) {
   );
 }
 
-function AddExamModal({ onClose, onAdd, subjects }: {
-  onClose: () => void; onAdd: (t: Omit<Task, "id" | "done" | "created_at">) => Promise<void>; subjects: SemesterSubject[];
+function ExamModal({ onClose, onSave, subjects, initial }: {
+  onClose: () => void; onSave: (t: Omit<Task, "id" | "done" | "created_at">) => Promise<void>; subjects: SemesterSubject[]; initial?: Task;
 }) {
-  const [name, setName] = useState("");
-  const [deadline, setDeadline] = useState("");
-  const [subject, setSubject] = useState(subjects[0]?.name ?? "");
-  const [category, setCategory] = useState<Task["exam_category"]>(null);
+  const [name, setName] = useState(initial?.name ?? "");
+  const [deadline, setDeadline] = useState(initial?.deadline && initial.deadline !== "No deadline" ? initial.deadline : "");
+  const [subject, setSubject] = useState(initial?.subject ?? "");
+  const [category, setCategory] = useState<Task["exam_category"]>(initial?.exam_category ?? null);
   const [saving, setSaving] = useState(false);
+  const isEdit = !!initial;
 
   const save = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    await onAdd({ name: name.trim(), type: "exam", deadline: deadline || "No deadline", subject: subject || null, exam_category: category });
+    await onSave({ name: name.trim(), type: "exam", deadline: deadline || "No deadline", subject: subject || null, exam_category: category });
     setSaving(false);
   };
 
@@ -122,7 +123,7 @@ function AddExamModal({ onClose, onAdd, subjects }: {
       <div className="modal-enter relative w-full lg:max-w-md rounded-t-2xl lg:rounded-2xl" style={{ background: N.bg, border: `1px solid ${N.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.14)" }}>
         <div className="w-8 h-1 rounded-full mx-auto mt-3 lg:hidden" style={{ background: N.border }} />
         <div className="px-5 py-5 pb-10 lg:pb-5 space-y-3">
-          <h3 className="text-[17px] font-bold" style={{ color: N.text }}>New Exam</h3>
+          <h3 className="text-[17px] font-bold" style={{ color: N.text }}>{isEdit ? "Edit Exam" : "New Exam"}</h3>
           <input autoFocus type="text" placeholder="Exam name" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()}
             className="w-full px-3 py-2.5 rounded-xl text-[14px] outline-none" style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
           <div>
@@ -159,15 +160,14 @@ function AddExamModal({ onClose, onAdd, subjects }: {
             <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>Date</p>
             <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-full px-3 py-2 rounded-xl text-[13px] outline-none" style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
           </div>
-          <button onClick={save} disabled={saving || !name.trim()} className="w-full py-2.5 rounded-xl text-[13px] font-semibold disabled:opacity-40" style={{ background: N.text, color: "white" }}>{saving ? "Saving…" : "Add Exam"}</button>
+          <button onClick={save} disabled={saving || !name.trim()} className="w-full py-2.5 rounded-xl text-[13px] font-semibold disabled:opacity-40" style={{ background: N.text, color: "white" }}>{saving ? "Saving…" : isEdit ? "Save Changes" : "Add Exam"}</button>
         </div>
       </div>
     </div>
   );
 }
 
-function ExamRow({ task, onToggle, onDelete, subjects, onUpdateGrade }: { task: Task; onToggle: (id: string) => void; onDelete: (id: string) => void; subjects: SemesterSubject[]; onUpdateGrade?: (id: string, grade: string) => void }) {
-  const [hov, setHov] = useState(false);
+function ExamRow({ task, onToggle, onDelete, onEdit, subjects, onUpdateGrade }: { task: Task; onToggle: (id: string) => void; onDelete: (id: string) => void; onEdit: (task: Task) => void; subjects: SemesterSubject[]; onUpdateGrade?: (id: string, grade: string) => void }) {
   const [editingGrade, setEditingGrade] = useState(false);
   const [gradeInput, setGradeInput] = useState(task.grade ?? "");
   const subColor = subjects.find((s) => s.name === task.subject)?.color;
@@ -187,10 +187,12 @@ function ExamRow({ task, onToggle, onDelete, subjects, onUpdateGrade }: { task: 
   const urgencyBorder = daysLeft !== null && daysLeft <= 3 ? "#FCA5A5" : daysLeft !== null && daysLeft <= 7 ? "#FED7AA" : N.border;
 
   return (
-    <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-      className="flex items-center gap-3 px-4 py-3 rounded-2xl transition-colors border"
-      style={{ background: task.done ? N.bg : urgencyBg, borderColor: task.done ? N.border : urgencyBorder }}>
-      <button onClick={() => onToggle(task.id)}
+    <div onClick={() => onEdit(task)}
+      className="flex items-center gap-3 px-4 py-3 rounded-2xl transition-colors border cursor-pointer"
+      style={{ background: task.done ? N.bg : urgencyBg, borderColor: task.done ? N.border : urgencyBorder }}
+      onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
+      onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}>
+      <button onClick={(e) => { e.stopPropagation(); onToggle(task.id); }}
         className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-all"
         style={task.done ? { background: N.muted, borderColor: N.muted } : { background: "transparent", borderColor: N.border }}>
         {task.done && <Ico.check />}
@@ -225,6 +227,7 @@ function ExamRow({ task, onToggle, onDelete, subjects, onUpdateGrade }: { task: 
               type="text"
               placeholder="e.g. 85, A+"
               value={gradeInput}
+              onClick={(e) => e.stopPropagation()}
               onChange={(e) => setGradeInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") { onUpdateGrade(task.id, gradeInput); setEditingGrade(false); }
@@ -235,7 +238,7 @@ function ExamRow({ task, onToggle, onDelete, subjects, onUpdateGrade }: { task: 
               style={{ background: N.hover, border: `1px solid ${N.accent}`, color: N.text }}
             />
           ) : (
-            <button onClick={() => setEditingGrade(true)}
+            <button onClick={(e) => { e.stopPropagation(); setEditingGrade(true); }}
               className="text-[12px] font-semibold px-2.5 py-0.5 rounded-lg transition-colors"
               style={task.grade
                 ? { background: "#DCFCE7", color: "#166534" }
@@ -244,7 +247,7 @@ function ExamRow({ task, onToggle, onDelete, subjects, onUpdateGrade }: { task: 
             </button>
           )
         )}
-        {hov && <button onClick={() => onDelete(task.id)} className="transition-colors" style={{ color: N.border }} onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")} onMouseLeave={(e) => (e.currentTarget.style.color = N.border)}><Ico.trash /></button>}
+        <button onClick={(e) => { e.stopPropagation(); onDelete(task.id); }} className="transition-colors p-1" style={{ color: N.border }} onMouseEnter={(e) => (e.currentTarget.style.color = "#EF4444")} onMouseLeave={(e) => (e.currentTarget.style.color = N.border)}><Ico.trash /></button>
       </div>
     </div>
   );
@@ -257,6 +260,7 @@ export default function ExamsPage() {
   const [activeSemesterId, setActiveSemesterId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const [filterSubject, setFilterSubject] = useState<string | null>(null);
@@ -290,6 +294,14 @@ export default function ExamsPage() {
     const { data } = await supabase.from("tasks").insert({ ...task, done: false, semester_id: activeSemesterId }).select().single();
     if (data) setTasks((p) => [...p, data as Task].sort((a, b) => (a.deadline ?? "").localeCompare(b.deadline ?? "")));
     setModal(false);
+  };
+
+  const updateTask = async (task: Omit<Task, "id" | "done" | "created_at">) => {
+    if (!editingTask) return;
+    const { error } = await supabase.from("tasks").update({ name: task.name, deadline: task.deadline, subject: task.subject, exam_category: task.exam_category }).eq("id", editingTask.id);
+    if (error) { alert(`Failed to save: ${error.message}`); return; }
+    setTasks((p) => p.map((t) => t.id === editingTask.id ? { ...t, ...task } : t));
+    setEditingTask(null);
   };
 
   const toggleTask = async (id: string) => {
@@ -383,7 +395,7 @@ export default function ExamsPage() {
             </div>
             {loading ? [1,2,3].map((i) => <div key={i} className="h-14 rounded-2xl animate-pulse mb-2" style={{ background: N.hover }} />) :
               undone.length === 0 ? <p className="text-[13px] py-6 text-center rounded-2xl" style={{ color: N.muted, background: N.hover }}>No upcoming exams</p> :
-              <div className="space-y-2">{undone.map((t) => <ExamRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} subjects={subjects} onUpdateGrade={updateGrade} />)}</div>
+              <div className="space-y-2">{undone.map((t) => <ExamRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onEdit={setEditingTask} subjects={subjects} onUpdateGrade={updateGrade} />)}</div>
             }
           </div>
 
@@ -393,12 +405,13 @@ export default function ExamsPage() {
                 <span style={{ transform: showDone ? "rotate(90deg)" : "none", transition: "transform 0.15s", display: "inline-block" }}><Ico.chevR /></span>
                 {done.length} passed
               </button>
-              {showDone && <div className="space-y-2 opacity-70">{done.map((t) => <ExamRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} subjects={subjects} onUpdateGrade={updateGrade} />)}</div>}
+              {showDone && <div className="space-y-2 opacity-70">{done.map((t) => <ExamRow key={t.id} task={t} onToggle={toggleTask} onDelete={deleteTask} onEdit={setEditingTask} subjects={subjects} onUpdateGrade={updateGrade} />)}</div>}
             </div>
           )}
         </div>
       </main>
-      {modal && <AddExamModal onClose={() => setModal(false)} onAdd={addTask} subjects={subjects} />}
+      {modal && <ExamModal onClose={() => setModal(false)} onSave={addTask} subjects={subjects} />}
+      {editingTask && <ExamModal onClose={() => setEditingTask(null)} onSave={updateTask} subjects={subjects} initial={editingTask} />}
     </div>
   );
 }
