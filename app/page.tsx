@@ -1485,6 +1485,62 @@ export default function Home() {
     return subjects.reduce((a, b) => (weeklyHours[a.id] ?? 0) <= (weeklyHours[b.id] ?? 0) ? a : b);
   }, [subjects, undoneTasks, weeklyHours]);
 
+  const studyRecommendation = useMemo(() => {
+    const reasons: { text: string; hours: number }[] = [];
+    let total = 0;
+    const todayDate = new Date(todayStr + "T12:00:00");
+
+    const daysUntil = (deadline: string) => {
+      if (!deadline || deadline === "No deadline") return 7;
+      return Math.round((new Date(deadline + "T12:00:00").getTime() - todayDate.getTime()) / 86400000);
+    };
+
+    // Homework workload
+    const hwTasks = tasks.filter((t) => !t.done && t.type === "homework");
+    let totalQLeft = 0, tasksNoQ = 0, hwHours = 0;
+    hwTasks.forEach((t) => {
+      const qLeft = Math.max(0, (t.total_questions ?? 0) - (t.completed_questions ?? 0));
+      const hasQ = (t.total_questions ?? 0) > 0;
+      const needed = hasQ ? qLeft / 30 : 0.5; // 2 min/question; 30min flat if no questions
+      const days = daysUntil(t.deadline);
+      hwHours += needed / Math.max(1, Math.min(days <= 0 ? 1 : days, 7));
+      if (hasQ) totalQLeft += qLeft; else tasksNoQ++;
+    });
+    if (hwHours > 0.05) {
+      const h = Math.round(hwHours * 10) / 10;
+      let text = "";
+      if (totalQLeft > 0 && tasksNoQ > 0) text = `${totalQLeft} questions + ${tasksNoQ} other assignment${tasksNoQ > 1 ? "s" : ""}`;
+      else if (totalQLeft > 0) text = `${totalQLeft} homework question${totalQLeft !== 1 ? "s" : ""} remaining`;
+      else text = `${tasksNoQ} homework assignment${tasksNoQ > 1 ? "s" : ""}`;
+      reasons.push({ text, hours: h });
+      total += hwHours;
+    }
+
+    // Other non-exam, non-homework undone tasks due soon
+    const otherTasks = tasks.filter((t) => !t.done && t.type !== "exam" && t.type !== "homework");
+    let otherHours = 0;
+    otherTasks.forEach((t) => {
+      const days = daysUntil(t.deadline);
+      otherHours += 0.5 / Math.max(1, Math.min(days <= 0 ? 1 : days, 7));
+    });
+    if (otherTasks.length > 0 && otherHours > 0.05) {
+      const h = Math.round(otherHours * 10) / 10;
+      reasons.push({ text: `${otherTasks.length} other task${otherTasks.length > 1 ? "s" : ""}`, hours: h });
+      total += otherHours;
+    }
+
+    // Exam prep
+    exams.forEach((exam) => {
+      const days = daysUntil(exam.deadline);
+      const examHours = days <= 1 ? 3 : days <= 3 ? 2 : 1;
+      const daysText = days <= 0 ? "today!" : days === 1 ? "tomorrow" : `in ${days} days`;
+      reasons.push({ text: `${exam.name} ${daysText}`, hours: examHours });
+      total += examHours;
+    });
+
+    return { hours: Math.round(total * 2) / 2, reasons };
+  }, [tasks, exams, todayStr]);
+
   const activeSemesterName = semesters.find((s) => s.id === activeSemesterId)?.name;
   const totalHrsThisWeek = Object.values(weeklyHours).reduce((a, b) => a + b, 0);
 
@@ -1617,22 +1673,49 @@ export default function Home() {
             )}
           </div>
 
-          {/* ── Recommended Study ── */}
-          {recommendedSubject && (
-            <div className="mb-10 flex items-center gap-4 px-5 py-4 rounded-2xl"
+          {/* ── Study Recommendation ── */}
+          {(studyRecommendation.hours > 0 || undoneTasks.length > 0 || exams.length > 0) && (
+            <div className="mb-10 px-5 py-4 rounded-2xl"
               style={{ background: "white", border: `1px solid ${N.border}`, boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
-              <div className="w-1 h-10 rounded-full flex-shrink-0" style={{ background: recommendedSubject.color }} />
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-widest mb-0.5" style={{ color: N.muted }}>
-                  Recommended Study
-                </p>
-                <p className="text-[16px] font-bold truncate" style={{ color: N.text }}>{recommendedSubject.name}</p>
+              <div className="flex items-center justify-between gap-4 mb-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-widest mb-0.5" style={{ color: N.muted }}>
+                    Recommended Study Today
+                  </p>
+                  {studyRecommendation.hours > 0 ? (
+                    <p className="text-[28px] font-bold leading-none" style={{ color: N.text }}>
+                      {studyRecommendation.hours}
+                      <span className="text-[16px] font-semibold ml-1" style={{ color: N.muted }}>hours</span>
+                    </p>
+                  ) : (
+                    <p className="text-[16px] font-semibold" style={{ color: "#16A34A" }}>All caught up! 🎉</p>
+                  )}
+                </div>
+                {recommendedSubject && (
+                  <button onClick={() => setModal("study")}
+                    className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all active:scale-95"
+                    style={{ background: N.accent, color: "white" }}>
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: recommendedSubject.color + "99" }} />
+                    {recommendedSubject.name}
+                  </button>
+                )}
               </div>
-              <button onClick={() => setModal("study")}
-                className="flex-shrink-0 px-4 py-2 rounded-xl text-[13px] font-semibold transition-all active:scale-95"
-                style={{ background: N.accent, color: "white" }}>
-                Start →
-              </button>
+              {studyRecommendation.reasons.length > 0 && (
+                <div className="space-y-1.5 pt-3" style={{ borderTop: `1px solid ${N.border}` }}>
+                  {studyRecommendation.reasons.map((r, i) => (
+                    <div key={i} className="flex items-center justify-between gap-3">
+                      <span className="text-[13px] flex items-center gap-2" style={{ color: N.muted }}>
+                        <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: N.muted }} />
+                        {r.text}
+                      </span>
+                      <span className="text-[12px] font-semibold flex-shrink-0 tabular-nums"
+                        style={{ color: N.text }}>
+                        ~{r.hours}h
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
