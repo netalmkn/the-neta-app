@@ -15,6 +15,7 @@ export interface Task {
   total_questions?: number | null;
   completed_questions?: number | null;
   grade?: string | null;
+  exam_category?: "quiz" | "midterm" | "final" | null;
   created_at?: string;
 }
 

@@ -19,6 +19,8 @@ interface Task {
   semester_id?: string | null;
   total_questions?: number | null;
   completed_questions?: number | null;
+  grade?: string | null;
+  exam_category?: "quiz" | "midterm" | "final" | null;
   created_at?: string;
 }
 
@@ -1529,13 +1531,18 @@ export default function Home() {
       total += otherHours;
     }
 
-    // Exam prep
+    // Exam prep — hours scale by category and urgency
+    const examPrepHours = (category: Task["exam_category"], days: number) => {
+      const base = category === "final" ? [4, 3, 2] : category === "midterm" ? [3, 2, 1.5] : [1.5, 1, 0.5]; // [<=1d, <=3d, <=7d]
+      return days <= 1 ? base[0] : days <= 3 ? base[1] : base[2];
+    };
     exams.forEach((exam) => {
       const days = daysUntil(exam.deadline);
-      const examHours = days <= 1 ? 3 : days <= 3 ? 2 : 1;
+      const h = examPrepHours(exam.exam_category, days);
+      const cat = exam.exam_category ? ` (${exam.exam_category})` : "";
       const daysText = days <= 0 ? "today!" : days === 1 ? "tomorrow" : `in ${days} days`;
-      reasons.push({ text: `${exam.name} ${daysText}`, hours: examHours });
-      total += examHours;
+      reasons.push({ text: `${exam.name}${cat} ${daysText}`, hours: h });
+      total += h;
     });
 
     return { hours: Math.round(total * 2) / 2, reasons };
@@ -1831,7 +1838,15 @@ export default function Home() {
                           style={{ borderBottom: `1px solid ${N.border}` }}>
                           <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: subColor ?? urgentColor }} />
                           <div className="flex-1 min-w-0">
-                            <p className="text-[14px] font-medium truncate" style={{ color: N.text }}>{exam.name}</p>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-[14px] font-medium truncate" style={{ color: N.text }}>{exam.name}</p>
+                              {exam.exam_category && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide flex-shrink-0"
+                                  style={{ background: exam.exam_category === "final" ? "#FFF1F2" : exam.exam_category === "midterm" ? "#FFF7ED" : "#EFF6FF", color: exam.exam_category === "final" ? "#BE123C" : exam.exam_category === "midterm" ? "#C2410C" : "#1D4ED8" }}>
+                                  {exam.exam_category}
+                                </span>
+                              )}
+                            </div>
                             {exam.subject && (
                               <p className="text-[12px] mt-0.5" style={{ color: N.muted }}>{exam.subject}</p>
                             )}

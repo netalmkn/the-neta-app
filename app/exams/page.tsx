@@ -82,18 +82,37 @@ function Sidebar({ semesters, activeSemesterId, onSwitch, onDelete, onCreate, on
   );
 }
 
+const EXAM_CATEGORIES: { value: Task["exam_category"]; label: string; bg: string; color: string }[] = [
+  { value: "quiz",    label: "Quiz",    bg: "#EFF6FF", color: "#1D4ED8" },
+  { value: "midterm", label: "Midterm", bg: "#FFF7ED", color: "#C2410C" },
+  { value: "final",   label: "Final",   bg: "#FFF1F2", color: "#BE123C" },
+];
+
+function ExamCategoryBadge({ category }: { category: Task["exam_category"] }) {
+  if (!category) return null;
+  const cat = EXAM_CATEGORIES.find((c) => c.value === category);
+  if (!cat) return null;
+  return (
+    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide"
+      style={{ background: cat.bg, color: cat.color }}>
+      {cat.label}
+    </span>
+  );
+}
+
 function AddExamModal({ onClose, onAdd, subjects }: {
   onClose: () => void; onAdd: (t: Omit<Task, "id" | "done" | "created_at">) => Promise<void>; subjects: SemesterSubject[];
 }) {
   const [name, setName] = useState("");
   const [deadline, setDeadline] = useState("");
   const [subject, setSubject] = useState(subjects[0]?.name ?? "");
+  const [category, setCategory] = useState<Task["exam_category"]>(null);
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    await onAdd({ name: name.trim(), type: "exam", deadline: deadline || "No deadline", subject: subject || null });
+    await onAdd({ name: name.trim(), type: "exam", deadline: deadline || "No deadline", subject: subject || null, exam_category: category });
     setSaving(false);
   };
 
@@ -106,6 +125,23 @@ function AddExamModal({ onClose, onAdd, subjects }: {
           <h3 className="text-[17px] font-bold" style={{ color: N.text }}>New Exam</h3>
           <input autoFocus type="text" placeholder="Exam name" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()}
             className="w-full px-3 py-2.5 rounded-xl text-[14px] outline-none" style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>Category</p>
+            <div className="flex gap-2">
+              <button onClick={() => setCategory(null)}
+                className="px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+                style={{ background: category === null ? N.active : N.hover, color: N.muted, border: category === null ? `1.5px solid ${N.border}` : "1.5px solid transparent" }}>
+                General
+              </button>
+              {EXAM_CATEGORIES.map((c) => (
+                <button key={c.value} onClick={() => setCategory(c.value)}
+                  className="px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors"
+                  style={{ background: category === c.value ? c.bg : N.hover, color: category === c.value ? c.color : N.muted, border: category === c.value ? `1.5px solid ${c.color}40` : "1.5px solid transparent" }}>
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
           {subjects.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>Subject</p>
@@ -120,7 +156,7 @@ function AddExamModal({ onClose, onAdd, subjects }: {
             </div>
           )}
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>Exam date</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5" style={{ color: N.muted }}>Date</p>
             <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-full px-3 py-2 rounded-xl text-[13px] outline-none" style={{ background: N.hover, border: `1px solid ${N.border}`, color: N.text }} />
           </div>
           <button onClick={save} disabled={saving || !name.trim()} className="w-full py-2.5 rounded-xl text-[13px] font-semibold disabled:opacity-40" style={{ background: N.text, color: "white" }}>{saving ? "Saving…" : "Add Exam"}</button>
@@ -160,7 +196,10 @@ function ExamRow({ task, onToggle, onDelete, subjects, onUpdateGrade }: { task: 
         {task.done && <Ico.check />}
       </button>
       <div className="flex-1 min-w-0">
-        <p className="text-[13px] font-medium truncate" style={{ color: task.done ? N.muted : N.text, textDecoration: task.done ? "line-through" : "none" }}>{task.name}</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-[13px] font-medium truncate" style={{ color: task.done ? N.muted : N.text, textDecoration: task.done ? "line-through" : "none" }}>{task.name}</p>
+          <ExamCategoryBadge category={task.exam_category} />
+        </div>
         {task.subject && (
           <p className="text-[11px] flex items-center gap-1 mt-0.5" style={{ color: N.muted }}>
             {subColor && <span className="w-2 h-2 rounded-full inline-block" style={{ background: subColor }} />}{task.subject}
@@ -221,6 +260,7 @@ export default function ExamsPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const [filterSubject, setFilterSubject] = useState<string | null>(null);
+  const [filterCategory, setFilterCategory] = useState<Task["exam_category"] | "all">("all");
 
   useEffect(() => {
     supabase.from("semesters").select("*").order("created_at").then(({ data }) => {
@@ -270,7 +310,11 @@ export default function ExamsPage() {
     await supabase.from("tasks").update({ grade: grade || null }).eq("id", id);
   };
 
-  const filtered = useMemo(() => filterSubject ? tasks.filter((t) => t.subject === filterSubject) : tasks, [tasks, filterSubject]);
+  const filtered = useMemo(() => {
+    let result = filterSubject ? tasks.filter((t) => t.subject === filterSubject) : tasks;
+    if (filterCategory !== "all") result = result.filter((t) => t.exam_category === filterCategory);
+    return result;
+  }, [tasks, filterSubject, filterCategory]);
   const undone = useMemo(() => filtered.filter((t) => !t.done), [filtered]);
   const done   = useMemo(() => filtered.filter((t) =>  t.done), [filtered]);
   const activeSemName = semesters.find((s) => s.id === activeSemesterId)?.name;
@@ -301,9 +345,19 @@ export default function ExamsPage() {
             <button onClick={() => setModal(true)} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-semibold transition-all active:scale-95" style={{ background: N.accent, color: "white", boxShadow: "0 2px 8px rgba(60,150,217,0.35)" }}><Ico.plus /> New exam</button>
           </div>
 
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            <button onClick={() => setFilterCategory("all")} className="px-3 py-1 rounded-full text-[12px] font-semibold transition-colors" style={{ background: filterCategory === "all" ? N.accent : N.hover, color: filterCategory === "all" ? "white" : N.muted }}>All</button>
+            {EXAM_CATEGORIES.map((c) => (
+              <button key={c.value} onClick={() => setFilterCategory(filterCategory === c.value ? "all" : c.value)}
+                className="px-3 py-1 rounded-full text-[12px] font-semibold transition-colors"
+                style={{ background: filterCategory === c.value ? c.bg : N.hover, color: filterCategory === c.value ? c.color : N.muted, border: filterCategory === c.value ? `1.5px solid ${c.color}40` : "1.5px solid transparent" }}>
+                {c.label}
+              </button>
+            ))}
+          </div>
           {subjects.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-5">
-              <button onClick={() => setFilterSubject(null)} className="px-3 py-1 rounded-full text-[12px] font-semibold transition-colors" style={{ background: filterSubject === null ? N.accent : N.hover, color: filterSubject === null ? "white" : N.muted }}>All</button>
+              <button onClick={() => setFilterSubject(null)} className="px-3 py-1 rounded-full text-[12px] font-semibold transition-colors" style={{ background: filterSubject === null ? N.text : N.hover, color: filterSubject === null ? "white" : N.muted }}>All subjects</button>
               {subjects.map((s) => (
                 <button key={s.id} onClick={() => setFilterSubject(filterSubject === s.name ? null : s.name)} className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold transition-colors" style={{ background: filterSubject === s.name ? s.color + "60" : N.hover, color: filterSubject === s.name ? N.text : N.muted, border: filterSubject === s.name ? `1.5px solid ${s.color}` : "1.5px solid transparent" }}>
                   <span className="w-2 h-2 rounded-full" style={{ background: s.color }} />{s.name}
